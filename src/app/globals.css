@@ -1,0 +1,84 @@
+/* Глобальные стили: светлая тема в стиле Gaijin — белый фон, красный акцент. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:           #FFFFFF;
+  --bg-card:      #FFFFFF;
+  --bg-section:   #F8F8F8;
+  --accent:       #E8192C;
+  --text:         #1A1A1A;
+  --text-muted:   #666666;
+  --border:       #E8E8E8;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  body {
+    @apply antialiased;
+    background-color: var(--bg-section);
+    min-height: 100dvh;
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+  button:focus-visible,
+  a:focus-visible {
+    @apply outline outline-2 outline-brand outline-offset-2;
+  }
+}
+
+@layer components {
+
+  /* Основная кнопка — красная */
+  .btn-primary {
+    @apply bg-brand hover:bg-brand-light active:bg-brand-dark
+           text-white font-semibold
+           px-5 py-2.5 rounded-btn
+           transition-colors duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* Вторичная кнопка */
+  .btn-secondary {
+    @apply border border-surface-border hover:border-brand
+           text-text-primary hover:text-brand
+           px-5 py-2.5 rounded-btn
+           transition-colors duration-150
+           bg-white;
+  }
+
+  /* Карточка блюда */
+  .card {
+    @apply bg-white rounded-card shadow-card
+           transition-all duration-200
+           hover:shadow-card-hover;
+  }
+
+  /* Поле ввода */
+  .input {
+    @apply bg-white border border-surface-border
+           text-text-primary placeholder:text-text-muted
+           rounded-btn px-4 py-2.5
+           focus:outline-none focus:border-brand
+           transition-colors duration-150
+           w-full;
+  }
+
+  /* Скрыть скроллбар (категории) */
+  .scroll-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scroll-hide::-webkit-scrollbar { display: none; }
+}
