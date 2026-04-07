@@ -26,6 +26,7 @@ export interface Product {
   image_url: string | null
   badges: Badge[]
   is_visible: boolean
+  is_featured: boolean
   discount_percent: number | null
   discount_fixed: number | null
   calories: number | null

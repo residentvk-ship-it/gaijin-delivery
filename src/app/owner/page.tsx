@@ -1,14 +1,25 @@
-// Панель владельца: список блюд и управление баннерами.
+// Панель владельца: список блюд и управление баннерами, статистикой, промокодами.
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Eye, EyeOff, Trash2, Star } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
 import { ProductForm } from '@/components/owner/ProductForm'
 import { BannerManager } from '@/components/owner/BannerManager'
+import { StatsPanel } from '@/components/owner/StatsPanel'
+import { PromoManager } from '@/components/owner/PromoManager'
 import type { Product, Category } from '@/types'
+
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const h = {
+  'apikey':        ANON,
+  'Authorization': `Bearer ${ANON}`,
+  'Content-Type':  'application/json',
+}
+
+type Tab = 'products' | 'banners' | 'stats' | 'promos'
 
 export default function OwnerPage() {
   const [products,    setProducts]    = useState<Product[]>([])
@@ -17,19 +28,10 @@ export default function OwnerPage() {
   const [showForm,    setShowForm]    = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [filterCat,   setFilterCat]   = useState<string>('all')
-  const [tab,         setTab]         = useState<'products' | 'banners'>('products')
-
-  const supabase = createClient()
+  const [tab,         setTab]         = useState<Tab>('products')
 
   async function load() {
     setIsLoading(true)
-    const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const h = {
-      'apikey':        ANON,
-      'Authorization': `Bearer ${ANON}`,
-      'Content-Type':  'application/json',
-    }
     const [p, c] = await Promise.all([
       fetch(`${URL}/rest/v1/products?order=sort_order`, { headers: h }).then(r => r.json()),
       fetch(`${URL}/rest/v1/categories?order=sort_order`, { headers: h }).then(r => r.json()),
@@ -42,24 +44,30 @@ export default function OwnerPage() {
   useEffect(() => { load() }, [])
 
   async function toggleVisible(p: Product) {
-    await supabase.from('products').update({ is_visible: !p.is_visible }).eq('id', p.id)
+    await fetch(`${URL}/rest/v1/products?id=eq.${p.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ is_visible: !p.is_visible }),
+    })
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, is_visible: !x.is_visible } : x))
   }
 
   async function toggleFeatured(p: Product) {
-    await supabase.from('products').update({ is_featured: !p.is_featured }).eq('id', p.id)
+    await fetch(`${URL}/rest/v1/products?id=eq.${p.id}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ is_featured: !p.is_featured }),
+    })
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, is_featured: !x.is_featured } : x))
   }
 
   async function deleteProduct(id: string) {
     if (!confirm('Удалить блюдо?')) return
-    await supabase.from('products').delete().eq('id', id)
+    await fetch(`${URL}/rest/v1/products?id=eq.${id}`, { method: 'DELETE', headers: h })
     setProducts(prev => prev.filter(x => x.id !== id))
   }
 
-  function openAdd()  { setEditProduct(null); setShowForm(true) }
-  function openEdit(p: Product) { setEditProduct(p); setShowForm(true) }
-  function closeForm() { setShowForm(false); setEditProduct(null); load() }
+  function openAdd()            { setEditProduct(null); setShowForm(true) }
+  function openEdit(p: Product) { setEditProduct(p);    setShowForm(true) }
+  function closeForm()          { setShowForm(false); setEditProduct(null); load() }
 
   const filtered   = filterCat === 'all' ? products : products.filter(p => p.category_id === filterCat)
   const getCatName = (id: string) => categories.find(c => c.id === id)?.name ?? '—'
@@ -87,7 +95,9 @@ export default function OwnerPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">
-              {tab === 'products' ? 'Меню' : 'Баннеры'}
+              {tab === 'products' ? 'Меню' :
+               tab === 'banners'  ? 'Баннеры' :
+               tab === 'stats'    ? 'Статистика' : 'Промокоды'}
             </h1>
             {tab === 'products' && (
               <p className="text-text-secondary text-sm mt-0.5">
@@ -103,14 +113,16 @@ export default function OwnerPage() {
         </div>
 
         {/* Вкладки */}
-        <div className="flex gap-0 mb-6 border-b border-surface-border">
-          {[
+        <div className="flex gap-0 mb-6 border-b border-surface-border overflow-x-auto scroll-hide">
+          {([
             { value: 'products', label: '🍱 Меню' },
             { value: 'banners',  label: '🖼 Баннеры' },
-          ].map(t => (
+            { value: 'stats',    label: '📊 Статистика' },
+            { value: 'promos',   label: '🎟 Промокоды' },
+          ] as const).map(t => (
             <button key={t.value}
-              onClick={() => setTab(t.value as 'products' | 'banners')}
-              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px
+              onClick={() => setTab(t.value)}
+              className={`flex-shrink-0 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px
                 ${tab === t.value
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -122,6 +134,12 @@ export default function OwnerPage() {
 
         {/* Вкладка: Баннеры */}
         {tab === 'banners' && <BannerManager />}
+
+        {/* Вкладка: Статистика */}
+        {tab === 'stats' && <StatsPanel />}
+
+        {/* Вкладка: Промокоды */}
+        {tab === 'promos' && <PromoManager />}
 
         {/* Вкладка: Меню */}
         {tab === 'products' && (
