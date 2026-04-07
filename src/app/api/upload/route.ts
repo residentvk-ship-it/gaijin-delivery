@@ -1,8 +1,12 @@
-// API загрузки фото: сохраняет изображение в public/uploads/products и возвращает URL.
-
+// API загрузки фото: сохраняет изображение в Supabase Storage и возвращает публичный URL.
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
+import { createClient } from '@supabase/supabase-js'
+
+// Используем сервисный ключ — только на сервере, даёт полный доступ к Storage
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,12 +17,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Файл не найден' }, { status: 400 })
     }
 
-    // Проверяем тип файла
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'Только изображения' }, { status: 400 })
     }
 
-    // Проверяем размер (макс 5MB)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json({ error: 'Файл слишком большой (макс 5MB)' }, { status: 400 })
     }
@@ -29,14 +31,26 @@ export async function POST(req: NextRequest) {
     // Уникальное имя файла
     const ext      = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const dir      = join(process.cwd(), 'public', 'uploads', 'products')
 
-    // Создаём папку если нет
-    await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, filename), buffer)
+    // Загружаем в Supabase Storage в bucket 'products'
+    const { error: uploadError } = await supabase.storage
+      .from('products')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false,
+      })
 
-    const url = `/uploads/products/${filename}`
-    return NextResponse.json({ url })
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError)
+      return NextResponse.json({ error: 'Ошибка загрузки в Storage' }, { status: 500 })
+    }
+
+    // Получаем публичный URL файла
+    const { data: urlData } = supabase.storage
+      .from('products')
+      .getPublicUrl(filename)
+
+    return NextResponse.json({ url: urlData.publicUrl })
 
   } catch (err) {
     console.error('Upload error:', err)
