@@ -45,13 +45,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ошибка загрузки в Storage' }, { status: 500 })
     }
 
-     // Собираем правильный публичный URL
+    // Собираем правильный публичный URL
     const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/products/${filename}`
-
-      return NextResponse.json({ url: publicUrl })
-
-    return NextResponse.json({ url: urlData.publicUrl })
-
+    
+    return NextResponse.json({ url: publicUrl })
   } catch (err) {
     console.error('Upload error:', err)
     return NextResponse.json({ error: 'Ошибка загрузки' }, { status: 500 })
