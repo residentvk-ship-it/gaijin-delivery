@@ -10,6 +10,10 @@ import { BannerManager } from '@/components/owner/BannerManager'
 import { StatsPanel } from '@/components/owner/StatsPanel'
 import { PromoManager } from '@/components/owner/PromoManager'
 import type { Product, Category } from '@/types'
+import { clients } from '@/components/owner/clients'
+import { history } from '@/components/owner/history'
+
+
 
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -115,10 +119,13 @@ export default function OwnerPage() {
         {/* Вкладки */}
         <div className="flex gap-0 mb-6 border-b border-surface-border overflow-x-auto scroll-hide">
           {([
-            { value: 'products', label: '🍱 Меню' },
-            { value: 'banners',  label: '🖼 Баннеры' },
-            { value: 'stats',    label: '📊 Статистика' },
-            { value: 'promos',   label: '🎟 Промокоды' },
+            { value: 'products', label: ' Меню' },
+            { value: 'stats',    label: 'Статистика' },
+            { value: 'promos',   label: 'Акции и Промокоды' },
+            { value: 'products', label: 'История заказов' },
+             { value: 'banners',  label: ' Баннеры' },
+            { value: 'products', label: ' Клиенты' },
+            
           ] as const).map(t => (
             <button key={t.value}
               onClick={() => setTab(t.value)}
@@ -134,6 +141,12 @@ export default function OwnerPage() {
 
         {/* Вкладка: Баннеры */}
         {tab === 'banners' && <BannerManager />}
+
+         {/* Вкладка: Клиенты */}
+        {tab === 'clients' && <clients />}
+
+         {/* Вкладка: История Заказов */}
+        {tab === 'history' && <history />}
 
         {/* Вкладка: Статистика */}
         {tab === 'stats' && <StatsPanel />}
