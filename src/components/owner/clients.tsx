@@ -31,7 +31,7 @@ export function Clients() {
         { headers: h }
       )
       const data = await res.json()
-      setClients(data as Client[])
+      setClients(Array.isArray(data) ? data as Client[] : [])
       setIsLoading(false)
     }
     load()
