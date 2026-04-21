@@ -9,11 +9,9 @@ import { ProductForm } from '@/components/owner/ProductForm'
 import { BannerManager } from '@/components/owner/BannerManager'
 import { StatsPanel } from '@/components/owner/StatsPanel'
 import { PromoManager } from '@/components/owner/PromoManager'
+import { Clients } from '@/components/owner/clients'
+import { History } from '@/components/owner/history'
 import type { Product, Category } from '@/types'
-import { clients } from '@/components/owner/clients'
-import { history } from '@/components/owner/history'
-
-
 
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -23,7 +21,16 @@ const h = {
   'Content-Type':  'application/json',
 }
 
-type Tab = 'products' | 'banners' | 'stats' | 'promos'
+type Tab = 'products' | 'banners' | 'stats' | 'promos' | 'clients' | 'history'
+
+const TAB_LABEL: Record<Tab, string> = {
+  products: 'Меню',
+  banners:  'Баннеры',
+  stats:    'Статистика',
+  promos:   'Акции и Промокоды',
+  clients:  'Клиенты',
+  history:  'История заказов',
+}
 
 export default function OwnerPage() {
   const [products,    setProducts]    = useState<Product[]>([])
@@ -98,11 +105,7 @@ export default function OwnerPage() {
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">
-              {tab === 'products' ? 'Меню' :
-               tab === 'banners'  ? 'Баннеры' :
-               tab === 'stats'    ? 'Статистика' : 'Промокоды'}
-            </h1>
+            <h1 className="text-2xl font-bold text-text-primary">{TAB_LABEL[tab]}</h1>
             {tab === 'products' && (
               <p className="text-text-secondary text-sm mt-0.5">
                 {products.length} позиций · {products.filter(p => p.is_visible).length} активных
@@ -118,41 +121,24 @@ export default function OwnerPage() {
 
         {/* Вкладки */}
         <div className="flex gap-0 mb-6 border-b border-surface-border overflow-x-auto scroll-hide">
-          {([
-            { value: 'products', label: ' Меню' },
-            { value: 'stats',    label: 'Статистика' },
-            { value: 'promos',   label: 'Акции и Промокоды' },
-            { value: 'products', label: 'История заказов' },
-             { value: 'banners',  label: ' Баннеры' },
-            { value: 'products', label: ' Клиенты' },
-            
-          ] as const).map(t => (
-            <button key={t.value}
-              onClick={() => setTab(t.value)}
+          {(Object.entries(TAB_LABEL) as [Tab, string][]).map(([value, label]) => (
+            <button key={value}
+              onClick={() => setTab(value)}
               className={`flex-shrink-0 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px
-                ${tab === t.value
+                ${tab === value
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}>
-              {t.label}
+              {label}
             </button>
           ))}
         </div>
 
-        {/* Вкладка: Баннеры */}
-        {tab === 'banners' && <BannerManager />}
-
-         {/* Вкладка: Клиенты */}
-        {tab === 'clients' && <clients />}
-
-         {/* Вкладка: История Заказов */}
-        {tab === 'history' && <history />}
-
-        {/* Вкладка: Статистика */}
-        {tab === 'stats' && <StatsPanel />}
-
-        {/* Вкладка: Промокоды */}
-        {tab === 'promos' && <PromoManager />}
+        {tab === 'banners'  && <BannerManager />}
+        {tab === 'clients'  && <Clients />}
+        {tab === 'history'  && <History />}
+        {tab === 'stats'    && <StatsPanel />}
+        {tab === 'promos'   && <PromoManager />}
 
         {/* Вкладка: Меню */}
         {tab === 'products' && (
