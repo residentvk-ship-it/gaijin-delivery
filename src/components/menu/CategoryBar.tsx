@@ -52,7 +52,7 @@ export function CategoryBar({ categories, activeSlug, onSelect }: Props) {
                 onSelect(cat.slug)
               }}
               className={cn(
-                'flex-shrink-0 px-5 py-4 text-sm font-medium transition-all border-b-2 select-none',
+                'flex-shrink-0 px-5 py-4 text-base font-medium transition-all border-b-2 select-none uppercase',
                 isActive
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-secondary hover:text-text-primary'

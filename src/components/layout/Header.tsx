@@ -76,17 +76,15 @@ export function Header() {
       <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
 
         {/* Логотип */}
-        <a href="/" className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-3xl font-black text-brand tracking-tight">
-            ВРЕМЯ ЕСТЬ
-          </span>
+        <a href="/" className="flex items-center flex-shrink-0">
+          <img src="/logo.png" alt="Время есть" className="h-40 w-auto" />
         </a>
 
         {/* Телефон */}
         <a href="tel:+78124163535"
            className="hidden sm:flex items-center gap-1.5 text-text-secondary hover:text-brand transition-colors">
           <Phone size={16} />
-          <span className="text-sm font-medium">8 (812) 416-35-35</span>
+          <span className="text-base font-medium">8 (812) 416-35-35</span>
         </a>
 
         {/* Правая часть — только после монтирования */}
@@ -146,7 +144,7 @@ export function Header() {
                 </div>
               ) : (
                 <a href="/auth/login"
-                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-btn
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn
                               text-text-secondary hover:text-brand text-sm transition-colors">
                   <User size={16} />
                   <span>Войти</span>
