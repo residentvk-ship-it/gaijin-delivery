@@ -160,7 +160,7 @@ export function CartDrawer() {
 
     clearCart()
     closeCart()
-    toast.success('Заказ оформлен! 🎉')
+    toast.success('Заказ оформлен! ')
     window.location.href = `/order/${order.id}`
   }
 
@@ -181,7 +181,7 @@ export function CartDrawer() {
           )}
           <h2 className="font-bold text-lg text-text-primary flex-1">
             {page === 1 ? (
-              <>Корзина {items.length > 0 && <span className="text-sm font-normal text-text-muted ml-1">{items.length} позиций</span>}</>
+              <>Мой заказ {items.length > 0 && <span className="text-sm font-normal text-text-muted ml-1">{items.length} позиций</span>}</>
             ) : 'Оформление'}
           </h2>
           {/* Шаги */}
@@ -204,8 +204,8 @@ export function CartDrawer() {
             <div className="px-5 pt-4 pb-2 flex-shrink-0">
               <div className="flex rounded-btn overflow-hidden border border-surface-border">
                 {([
-                  { value: 'delivery', label: '🛵 Доставка' },
-                  { value: 'pickup',   label: '🏃 Самовывоз' },
+                  { value: 'delivery', label: ' Доставка' },
+                  { value: 'pickup',   label: ' Самовывоз' },
                 ] as const).map(({ value, label }) => (
                   <button key={value} onClick={() => setDeliveryType(value)}
                     className={`flex-1 py-2 text-sm font-medium transition-colors
