@@ -43,10 +43,14 @@ const h = {
   'Content-Type':  'application/json',
 }
 
+type Period = 'today' | 'week' | 'month' | 'all' | 'custom'
+
 export function StatsPanel() {
   const [orders,   setOrders]   = useState<Order[]>([])
   const [loading,  setLoading]  = useState(true)
-  const [period,   setPeriod]   = useState<'today' | 'week' | 'month'>('week')
+  const [period,   setPeriod]   = useState<Period>('week')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -61,8 +65,18 @@ export function StatsPanel() {
     setLoading(false)
   }
 
-  // Фильтруем по периоду
   function filterByPeriod(orders: Order[]) {
+    if (period === 'all') return orders
+    if (period === 'custom') {
+      if (!dateFrom || !dateTo) return orders
+      const from = new Date(dateFrom)
+      const to   = new Date(dateTo)
+      to.setHours(23, 59, 59, 999)
+      return orders.filter(o => {
+        const d = new Date(o.created_at)
+        return d >= from && d <= to
+      })
+    }
     const now  = new Date()
     const from = new Date()
     if (period === 'today') from.setHours(0, 0, 0, 0)
@@ -80,20 +94,22 @@ export function StatsPanel() {
 
   // Статистика по дням
   const dayStats: DayStat[] = []
-  const days = period === 'today' ? 1 : period === 'week' ? 7 : 30
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-    const dayOrders = completed.filter(o => {
-      const od = new Date(o.created_at)
-      return od.toDateString() === d.toDateString()
-    })
-    dayStats.push({
-      date:    dateStr,
-      revenue: dayOrders.reduce((s, o) => s + o.total, 0),
-      count:   dayOrders.length,
-    })
+  const days = period === 'today' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 0
+  if (period !== 'all' && period !== 'custom') {
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+      const dayOrders = completed.filter(o => {
+        const od = new Date(o.created_at)
+        return od.toDateString() === d.toDateString()
+      })
+      dayStats.push({
+        date:    dateStr,
+        revenue: dayOrders.reduce((s, o) => s + o.total, 0),
+        count:   dayOrders.length,
+      })
+    }
   }
 
   // Топ блюд
@@ -127,30 +143,53 @@ export function StatsPanel() {
     <div className="space-y-6">
 
       {/* Переключатель периода */}
-      <div className="flex gap-2">
-        {([
-          { value: 'today', label: 'Сегодня' },
-          { value: 'week',  label: '7 дней'  },
-          { value: 'month', label: '30 дней' },
-        ] as const).map(p => (
-          <button key={p.value} onClick={() => setPeriod(p.value)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors
-              ${period === p.value
-                ? 'bg-brand text-white'
-                : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'
-              }`}>
-            {p.label}
-          </button>
-        ))}
+      <div>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'today',  label: 'Сегодня'   },
+            { value: 'week',   label: '7 дней'    },
+            { value: 'month',  label: '30 дней'   },
+            { value: 'all',    label: 'Всё время' },
+            { value: 'custom', label: 'Интервал'  },
+          ] as const).map(p => (
+            <button key={p.value} onClick={() => setPeriod(p.value)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors
+                ${period === p.value
+                  ? 'bg-brand text-white'
+                  : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'
+                }`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Поля дат для кастомного интервала */}
+        {period === 'custom' && (
+          <div className="flex items-center gap-2 mt-3">
+            <input
+              type="date"
+              className="input text-sm"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+            />
+            <span className="text-text-muted">—</span>
+            <input
+              type="date"
+              className="input text-sm"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Карточки метрик */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Выручка',        value: formatPrice(revenue),        icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Заказов',        value: String(filtered.length),     icon: ShoppingBag, color: 'text-brand',    bg: 'bg-red-50'   },
-          { label: 'Средний чек',    value: formatPrice(avgOrder),       icon: Users,       color: 'text-blue-600', bg: 'bg-blue-50'  },
-          { label: 'Активных',       value: String(active.length),       icon: Clock,       color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: 'Выручка',     value: formatPrice(revenue),    icon: TrendingUp, color: 'text-green-600',  bg: 'bg-green-50'  },
+          { label: 'Заказов',     value: String(filtered.length), icon: ShoppingBag, color: 'text-brand',     bg: 'bg-red-50'    },
+          { label: 'Средний чек', value: formatPrice(avgOrder),   icon: Users,       color: 'text-blue-600',  bg: 'bg-blue-50'   },
+          { label: 'Активных',    value: String(active.length),   icon: Clock,       color: 'text-yellow-600', bg: 'bg-yellow-50' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-card shadow-card p-4">
             <div className={`w-10 h-10 rounded-btn ${bg} flex items-center justify-center mb-3`}>
@@ -163,7 +202,7 @@ export function StatsPanel() {
       </div>
 
       {/* График выручки по дням */}
-      {period !== 'today' && (
+      {dayStats.length > 1 && (
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">Выручка по дням</h3>
           <div className="flex items-end gap-1 h-32">
@@ -173,7 +212,6 @@ export function StatsPanel() {
                   className="w-full bg-brand/20 hover:bg-brand/40 rounded-t transition-colors cursor-pointer relative"
                   style={{ height: `${(d.revenue / maxRevenue) * 100}%`, minHeight: d.revenue > 0 ? '4px' : '0' }}
                 >
-                  {/* Тултип */}
                   {d.revenue > 0 && (
                     <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:block
                                     bg-text-primary text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
@@ -193,7 +231,6 @@ export function StatsPanel() {
       {/* Топ блюд + последние заказы */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* Топ блюд */}
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">🏆 Топ блюд</h3>
           {topProducts.length === 0 ? (
@@ -202,9 +239,7 @@ export function StatsPanel() {
             <div className="space-y-3">
               {topProducts.map((p, i) => (
                 <div key={p.name} className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-text-muted w-6 text-center">
-                    {i + 1}
-                  </span>
+                  <span className="text-lg font-bold text-text-muted w-6 text-center">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">{p.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -226,7 +261,6 @@ export function StatsPanel() {
           )}
         </div>
 
-        {/* Последние заказы */}
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">📋 Последние заказы</h3>
           {filtered.length === 0 ? (
