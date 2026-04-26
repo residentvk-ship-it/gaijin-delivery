@@ -1,12 +1,10 @@
-// Форма добавления и редактирования блюда: все поля, загрузка фото, бейджи, скидки.
-
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Upload, Loader2 } from 'lucide-react'
+import { X, Upload, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import type { Product, Category, Badge } from '@/types'
+import type { Product, Category, Badge, Topping } from '@/types'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -23,14 +21,19 @@ const BADGES: { value: Badge; label: string }[] = [
   { value: 'vegan', label: '🌿 Веган' },
 ]
 
+function genId() {
+  return Math.random().toString(36).slice(2, 10)
+}
+
 export function ProductForm({ product, categories, onClose }: Props) {
   const supabase = createClient()
   const fileRef  = useRef<HTMLInputElement>(null)
 
-  const [saving,     setSaving]     = useState(false)
-  const [uploading,  setUploading]  = useState(false)
-  const [imageUrl,   setImageUrl]   = useState(product?.image_url ?? '')
+  const [saving,       setSaving]       = useState(false)
+  const [uploading,    setUploading]    = useState(false)
+  const [imageUrl,     setImageUrl]     = useState(product?.image_url ?? '')
   const [imagePreview, setImagePreview] = useState(product?.image_url ?? '')
+  const [toppings,     setToppings]     = useState<Topping[]>(product?.toppings ?? [])
 
   const [form, setForm] = useState({
     name:             product?.name             ?? '',
@@ -59,39 +62,50 @@ export function ProductForm({ product, categories, onClose }: Props) {
     )
   }
 
+  // ── Топпинги ──────────────────────────────────────────────────────────────
+
+  function addTopping() {
+    setToppings(t => [...t, { id: genId(), name: '', price: 0 }])
+  }
+
+  function updateTopping(id: string, field: keyof Topping, value: string | number) {
+    setToppings(t => t.map(top => top.id === id ? { ...top, [field]: value } : top))
+  }
+
+  function removeTopping(id: string) {
+    setToppings(t => t.filter(top => top.id !== id))
+  }
+
+  // ── Фото ──────────────────────────────────────────────────────────────────
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // Превью
     setImagePreview(URL.createObjectURL(file))
     setUploading(true)
-
     const data = new FormData()
     data.append('file', file)
-
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: data })
+      const res  = await fetch('/api/upload', { method: 'POST', body: data })
       const json = await res.json()
-      if (json.url) {
-        setImageUrl(json.url)
-        toast.success('Фото загружено')
-      } else {
-        toast.error(json.error ?? 'Ошибка загрузки')
-        setImagePreview(imageUrl)
-      }
+      if (json.url) { setImageUrl(json.url); toast.success('Фото загружено') }
+      else          { toast.error(json.error ?? 'Ошибка загрузки'); setImagePreview(imageUrl) }
     } catch {
-      toast.error('Ошибка загрузки фото')
-      setImagePreview(imageUrl)
+      toast.error('Ошибка загрузки фото'); setImagePreview(imageUrl)
     } finally {
       setUploading(false)
     }
   }
 
+  // ── Сохранение ────────────────────────────────────────────────────────────
+
   async function handleSubmit() {
-    if (!form.name.trim()) { toast.error('Введите название'); return }
-    if (!form.price)        { toast.error('Введите цену');    return }
+    if (!form.name.trim()) { toast.error('Введите название');    return }
+    if (!form.price)        { toast.error('Введите цену');        return }
     if (!form.category_id)  { toast.error('Выберите категорию'); return }
+
+    const invalidTopping = toppings.find(t => !t.name.trim())
+    if (invalidTopping)   { toast.error('Заполните название топпинга'); return }
 
     setSaving(true)
 
@@ -110,6 +124,7 @@ export function ProductForm({ product, categories, onClose }: Props) {
       is_featured:      form.is_featured,
       sort_order:       Number(form.sort_order),
       image_url:        imageUrl || null,
+      toppings:         toppings,
     }
 
     const { error } = product
@@ -118,12 +133,8 @@ export function ProductForm({ product, categories, onClose }: Props) {
 
     setSaving(false)
 
-    if (error) {
-      toast.error('Ошибка сохранения: ' + error.message)
-    } else {
-      toast.success(product ? 'Блюдо обновлено' : 'Блюдо добавлено')
-      onClose()
-    }
+    if (error) { toast.error('Ошибка сохранения: ' + error.message) }
+    else       { toast.success(product ? 'Блюдо обновлено' : 'Блюдо добавлено'); onClose() }
   }
 
   return (
@@ -164,12 +175,8 @@ export function ProductForm({ product, categories, onClose }: Props) {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="btn-secondary flex items-center gap-2 text-sm"
-                >
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="btn-secondary flex items-center gap-2 text-sm">
                   {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   {uploading ? 'Загружаю...' : 'Выбрать файл'}
                 </button>
@@ -249,6 +256,56 @@ export function ProductForm({ product, categories, onClose }: Props) {
               <input className="input" type="number" min="0" value={form.discount_fixed}
                 onChange={e => set('discount_fixed', e.target.value)} placeholder="100" />
             </div>
+          </div>
+
+          {/* Топпинги */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-text-primary">
+                Топпинги / модификаторы
+              </label>
+              <button type="button" onClick={addTopping}
+                className="flex items-center gap-1 text-xs text-brand hover:underline">
+                <Plus size={13} /> Добавить
+              </button>
+            </div>
+
+            {toppings.length === 0 && (
+              <p className="text-xs text-text-muted py-2">
+                Нет топпингов — клиент не увидит доп. опций
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {toppings.map(top => (
+                <div key={top.id} className="flex gap-2 items-center">
+                  <input
+                    className="input flex-1"
+                    placeholder="Название (напр. Халапеньо / Без лука)"
+                    value={top.name}
+                    onChange={e => updateTopping(top.id, 'name', e.target.value)}
+                  />
+                  <input
+                    className="input w-24"
+                    type="number"
+                    min="0"
+                    placeholder="₽"
+                    value={top.price}
+                    onChange={e => updateTopping(top.id, 'price', Number(e.target.value))}
+                  />
+                  <button type="button" onClick={() => removeTopping(top.id)}
+                    className="text-text-muted hover:text-brand transition-colors flex-shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {toppings.length > 0 && (
+              <p className="text-xs text-text-muted mt-1.5">
+                Цена 0 ₽ — бесплатно или убрать ингредиент
+              </p>
+            )}
           </div>
 
           {/* Бейджи */}

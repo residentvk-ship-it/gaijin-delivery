@@ -8,21 +8,27 @@ export interface Category {
   slug: string
   sort_order: number
   is_visible: boolean
-  available_from: string | null // "HH:MM" — время начала доступности
-  available_to: string | null   // "HH:MM" — время конца доступности
+  available_from: string | null
+  available_to: string | null
 }
 
 // ─── Блюда ────────────────────────────────────────────────────────────────────
 
 export type Badge = 'hit' | 'new' | 'spicy' | 'sale' | 'vegan'
 
+export interface Topping {
+  id: string      // uuid, генерируется при создании в ProductForm
+  name: string    // "Халапеньо", "Без лука"
+  price: number   // 0 = бесплатно / убрать ингредиент
+}
+
 export interface Product {
   id: string
   category_id: string
   name: string
   description: string | null
-  weight: number | null          // в граммах
-  price: number                  // в рублях
+  weight: number | null
+  price: number
   image_url: string | null
   badges: Badge[]
   is_visible: boolean
@@ -31,7 +37,7 @@ export interface Product {
   discount_fixed: number | null
   calories: number | null
   allergens: string[]
-  // Вычисляемое поле — финальная цена с учётом скидки
+  toppings: Topping[]       // доступные опции для этого блюда
   final_price?: number
 }
 
@@ -40,17 +46,19 @@ export interface Product {
 export interface CartItem {
   product: Product
   quantity: number
+  selectedToppings: Topping[]   // выбранные пользователем
+  cartKey: string               // productId + sorted topping ids — уникальный ключ позиции
 }
 
 // ─── Заказы ───────────────────────────────────────────────────────────────────
 
 export type OrderStatus =
-  | 'new'          // Новый
-  | 'accepted'     // Принят
-  | 'cooking'      // Готовится
-  | 'delivering'   // Доставляется
-  | 'completed'    // Выполнен
-  | 'cancelled'    // Отменён
+  | 'new'
+  | 'accepted'
+  | 'cooking'
+  | 'delivering'
+  | 'completed'
+  | 'cancelled'
 
 export type PaymentMethod = 'online' | 'cash'
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -61,13 +69,14 @@ export interface OrderItemSnapshot {
   price_at_order: number
   quantity: number
   image_url: string | null
+  selectedToppings: Topping[]   // снимок выбранных топпингов
 }
 
 export interface Order {
   id: string
   user_id: string | null
   status: OrderStatus
-  items: OrderItemSnapshot[]     // jsonb — снимок позиций на момент заказа
+  items: OrderItemSnapshot[]
   total: number
   address: string
   delivery_zone_id: string | null
@@ -76,7 +85,6 @@ export interface Order {
   promo_code_id: string | null
   comment: string | null
   created_at: string
-  // Связанные данные (JOIN)
   user_profile?: UserProfile
   delivery_zone?: DeliveryZone
 }
@@ -100,7 +108,7 @@ export interface PromoCode {
 export type UserRole = 'customer' | 'admin' | 'owner'
 
 export interface UserProfile {
-  id: string              // = auth.uid из Supabase
+  id: string
   name: string | null
   phone: string | null
   phone_verified: boolean
@@ -112,7 +120,7 @@ export interface SavedAddress {
   id: string
   user_id: string
   address_text: string
-  label: string | null    // например "Дом", "Работа"
+  label: string | null
   coords: { lat: number; lng: number } | null
 }
 
@@ -121,20 +129,19 @@ export interface SavedAddress {
 export interface DeliveryZone {
   id: string
   name: string
-  polygon: Array<{ lat: number; lng: number }>  // jsonb — массив координат
-  min_order: number         // минимальная сумма заказа в рублях
-  delivery_price: number    // стоимость доставки в рублях
-  delivery_time_min: number // время доставки в минутах
+  polygon: Array<{ lat: number; lng: number }>
+  min_order: number
+  delivery_price: number
+  delivery_time_min: number
 }
 
 // ─── Конфигурация сайта ───────────────────────────────────────────────────────
 
 export interface SiteConfig {
-  // Ключи из таблицы site_config
-  is_open: boolean                    // принимаем ли заказы
-  min_order_amount: number            // минимальная сумма заказа (глобально)
-  working_hours_from: string          // "HH:MM"
-  working_hours_to: string            // "HH:MM"
+  is_open: boolean
+  min_order_amount: number
+  working_hours_from: string
+  working_hours_to: string
   phone: string
   address: string
   vk_url: string | null
