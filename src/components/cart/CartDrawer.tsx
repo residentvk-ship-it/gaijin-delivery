@@ -15,20 +15,55 @@ import Image from 'next/image'
 type DeliveryType = 'delivery' | 'pickup'
 type Page = 1 | 2
 
+// Пороги — заглушки, потом вынесем в site_config
+const FREE_DELIVERY_THRESHOLD = 500   // ₽ бесплатная доставка
+const GIFT_THRESHOLD          = 3000  // ₽ подарок
+
+function ProgressBar({
+  current, target, label, reachedLabel, color,
+}: {
+  current: number
+  target: number
+  label: (left: number) => string
+  reachedLabel: string
+  color: string
+}) {
+  const reached = current >= target
+  const pct     = Math.min((current / target) * 100, 100)
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className={`text-xs font-medium ${reached ? 'text-green-600' : 'text-text-secondary'}`}>
+          {reached ? reachedLabel : label(target - current)}
+        </span>
+        {!reached && (
+          <span className="text-xs text-text-muted">{formatPrice(current)} / {formatPrice(target)}</span>
+        )}
+      </div>
+      <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function CartDrawer() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice, clearCart } = useCartStore()
 
-  const [page,         setPage]         = useState<Page>(1)
-  const [deliveryType, setDeliveryType] = useState<DeliveryType>('delivery')
-  const [address,      setAddress]      = useState('')
+  const [page,          setPage]          = useState<Page>(1)
+  const [deliveryType,  setDeliveryType]  = useState<DeliveryType>('delivery')
+  const [address,       setAddress]       = useState('')
   const [showAddrModal, setShowAddrModal] = useState(false)
-  const [persons,      setPersons]      = useState(1)
-  const [chopsticks,   setChopsticks]   = useState(0)
-  const [forks,        setForks]        = useState(0)
-  const [promoInput,   setPromoInput]   = useState('')
-  const [promoCode,    setPromoCode]    = useState<PromoCode | null>(null)
-  const [promoLoading, setPromoLoading] = useState(false)
-  const [promoError,   setPromoError]   = useState('')
+  const [persons,       setPersons]       = useState(1)
+  const [chopsticks,    setChopsticks]    = useState(0)
+  const [forks,         setForks]         = useState(0)
+  const [promoInput,    setPromoInput]    = useState('')
+  const [promoCode,     setPromoCode]     = useState<PromoCode | null>(null)
+  const [promoLoading,  setPromoLoading]  = useState(false)
+  const [promoError,    setPromoError]    = useState('')
 
   // Страница 2
   const [name,          setName]          = useState('')
@@ -37,7 +72,6 @@ export function CartDrawer() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash')
   const [submitting,    setSubmitting]    = useState(false)
 
-  // Двигаем страницу влево на десктопе
   useEffect(() => {
     const isDesktop = window.innerWidth >= 640
     if (isOpen && isDesktop) {
@@ -49,7 +83,6 @@ export function CartDrawer() {
     return () => { document.body.style.marginRight = '0' }
   }, [isOpen])
 
-  // Сбрасываем страницу при закрытии
   useEffect(() => {
     if (!isOpen) setPage(1)
   }, [isOpen])
@@ -96,7 +129,6 @@ export function CartDrawer() {
     const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-    // Получаем токен если залогинен
     let token = ANON
     let userId = null
     try {
@@ -184,7 +216,6 @@ export function CartDrawer() {
               <>Мой заказ {items.length > 0 && <span className="text-sm font-normal text-text-muted ml-1">{items.length} позиций</span>}</>
             ) : 'Оформление'}
           </h2>
-          {/* Шаги */}
           <div className="flex items-center gap-1 mr-2">
             {[1,2].map(p => (
               <div key={p} className={`w-2 h-2 rounded-full transition-colors
@@ -200,8 +231,8 @@ export function CartDrawer() {
         {/* ═══ СТРАНИЦА 1 ═══ */}
         {page === 1 && (
           <>
-            {/* Переключатель */}
-            <div className="px-5 pt-4 pb-2 flex-shrink-0">
+            {/* Переключатель + бар доставки */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0 space-y-3">
               <div className="flex rounded-btn overflow-hidden border border-surface-border">
                 {([
                   { value: 'delivery', label: ' Доставка' },
@@ -214,6 +245,17 @@ export function CartDrawer() {
                   </button>
                 ))}
               </div>
+
+              {/* Бар 1 — бесплатная доставка (только для доставки) */}
+              {deliveryType === 'delivery' && items.length > 0 && (
+                <ProgressBar
+                  current={subtotal}
+                  target={FREE_DELIVERY_THRESHOLD}
+                  label={left => `🚚 До бесплатной доставки ${formatPrice(left)}`}
+                  reachedLabel="🚚 Бесплатная доставка!"
+                  color="bg-brand"
+                />
+              )}
             </div>
 
             {/* Пустая */}
@@ -230,7 +272,7 @@ export function CartDrawer() {
                   {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => {
                     const price = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
                     return (
-                      <div key={product.id} className="flex gap-3 items-start">
+                      <div key={cartKey} className="flex gap-3 items-start">
                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
                           {product.image_url
                             ? <Image src={product.image_url} alt={product.name} width={64} height={64} className="w-full h-full object-cover" />
@@ -277,6 +319,15 @@ export function CartDrawer() {
                       <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
                     </button>
                   )}
+
+                  {/* Бар 2 — подарок (под адресом) */}
+                  <ProgressBar
+                    current={subtotal}
+                    target={GIFT_THRESHOLD}
+                    label={left => `🎁 До подарка ${formatPrice(left)}`}
+                    reachedLabel="🎁 Подарок добавлен!"
+                    color="bg-green-500"
+                  />
 
                   {/* Персоны */}
                   <div className="flex items-center gap-2 px-3 py-2 bg-surface-section rounded-btn">
@@ -382,7 +433,6 @@ export function CartDrawer() {
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
-              {/* Контакты */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-text-primary text-sm">Контактные данные</h3>
                 <div>
@@ -403,7 +453,6 @@ export function CartDrawer() {
                 </div>
               </div>
 
-              {/* Оплата */}
               <div className="space-y-2">
                 <h3 className="font-semibold text-text-primary text-sm">Способ оплаты</h3>
                 <div className="grid grid-cols-2 gap-2">
@@ -424,7 +473,6 @@ export function CartDrawer() {
                 </div>
               </div>
 
-              {/* Итог */}
               <div className="bg-surface-section rounded-card p-4 space-y-1.5">
                 <p className="font-semibold text-text-primary text-sm mb-2">Ваш заказ</p>
                 {items.map(({ product, quantity }) => (
@@ -447,7 +495,6 @@ export function CartDrawer() {
               </div>
             </div>
 
-            {/* Кнопка */}
             <div className="border-t border-surface-border px-5 py-4 flex-shrink-0">
               <button onClick={handleSubmit} disabled={submitting}
                 className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
@@ -461,7 +508,6 @@ export function CartDrawer() {
         )}
       </div>
 
-      {/* Модалка адреса */}
       {showAddrModal && (
         <AddressModal
           value={address}
