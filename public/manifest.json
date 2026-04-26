@@ -4,7 +4,7 @@
   "description": "Доставка суши, роллов, пиццы и горячего",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f6eb",
+  "background_color": "#FFFFFF",
   "theme_color": "#4ECDC4",
   "orientation": "portrait",
   "icons": [
