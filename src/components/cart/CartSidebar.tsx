@@ -75,7 +75,7 @@ export function CartSidebar() {
 
       {/* Список — скроллится */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {items.map(({ product, quantity }) => {
+        {items.map(({ product, quantity, cartKey }) => {
           const price = calcFinalPrice(product)
           return (
             <div key={product.id} className="flex gap-2 items-start">
@@ -97,7 +97,7 @@ export function CartSidebar() {
                 {/* Счётчик */}
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <button
-                    onClick={() => updateQuantity(product.id, quantity - 1)}
+                    onClick={() => updateQuantity(cartKey, quantity - 1)}
                     className="w-6 h-6 rounded-full border border-surface-border
                                hover:border-brand hover:text-brand text-text-secondary
                                flex items-center justify-center transition-colors"
@@ -108,7 +108,7 @@ export function CartSidebar() {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => updateQuantity(product.id, quantity + 1)}
+                    onClick={() => updateQuantity(cartKey, quantity + 1)}
                     className="w-6 h-6 rounded-full bg-brand hover:bg-brand-light
                                text-white flex items-center justify-center transition-colors"
                   >
@@ -122,7 +122,7 @@ export function CartSidebar() {
                 <p className="text-xs font-semibold text-text-primary">
                   {formatPrice(price * quantity)}
                 </p>
-                <button onClick={() => removeItem(product.id)}
+                <button onClick={() => removeItem(cartKey)}
                   className="text-text-muted hover:text-brand transition-colors">
                   <X size={12} />
                 </button>

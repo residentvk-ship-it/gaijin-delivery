@@ -227,7 +227,7 @@ export function CartDrawer() {
               <>
                 {/* Список */}
                 <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-                  {items.map(({ product, quantity }) => {
+                  {items.map(({ product, quantity, cartKey }) => {
                     const price = calcFinalPrice(product)
                     return (
                       <div key={product.id} className="flex gap-3 items-start">
@@ -241,12 +241,12 @@ export function CartDrawer() {
                           <p className="text-sm font-medium text-text-primary line-clamp-2 leading-snug">{product.name}</p>
                           <p className="text-xs text-text-muted mt-0.5">{formatPrice(price)}</p>
                           <div className="flex items-center gap-2 mt-1.5">
-                            <button onClick={() => updateQuantity(product.id, quantity - 1)}
+                            <button onClick={() => updateQuantity(cartKey, quantity - 1)}
                               className="w-7 h-7 rounded-full border border-surface-border hover:border-brand hover:text-brand text-text-secondary flex items-center justify-center transition-colors">
                               {quantity === 1 ? <Trash2 size={12} /> : <Minus size={12} />}
                             </button>
                             <span className="text-text-primary font-semibold text-sm w-4 text-center">{quantity}</span>
-                            <button onClick={() => updateQuantity(product.id, quantity + 1)}
+                            <button onClick={() => updateQuantity(cartKey, quantity + 1)}
                               className="w-7 h-7 rounded-full bg-brand hover:bg-brand-light text-white flex items-center justify-center transition-colors">
                               <Plus size={12} />
                             </button>
@@ -254,7 +254,7 @@ export function CartDrawer() {
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           <p className="text-sm font-semibold text-text-primary">{formatPrice(price * quantity)}</p>
-                          <button onClick={() => removeItem(product.id)} className="text-text-muted hover:text-brand transition-colors">
+                          <button onClick={() => removeItem(cartKey)} className="text-text-muted hover:text-brand transition-colors">
                             <X size={14} />
                           </button>
                         </div>
