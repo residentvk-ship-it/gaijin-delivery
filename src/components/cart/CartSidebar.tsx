@@ -75,8 +75,8 @@ export function CartSidebar() {
 
       {/* Список — скроллится */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {items.map(({ product, quantity, cartKey }) => {
-          const price = calcFinalPrice(product)
+        {items.map(({ product, quantity, cartKey, selectedToppings }) => {
+          const price = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
           return (
             <div key={product.id} className="flex gap-2 items-start">
               {/* Фото */}
