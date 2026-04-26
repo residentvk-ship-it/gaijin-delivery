@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Pencil, Trash2, Eye, EyeOff, Upload, Loader2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, Upload, Loader2, X, Monitor, Smartphone } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Banner {
@@ -25,20 +25,39 @@ const h = {
 }
 
 export function BannerManager() {
-  const [banners,  setBanners]  = useState<Banner[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing,  setEditing]  = useState<Banner | null>(null)
+  const [banners,         setBanners]         = useState<Banner[]>([])
+  const [loading,         setLoading]         = useState(true)
+  const [showForm,        setShowForm]        = useState(false)
+  const [editing,         setEditing]         = useState<Banner | null>(null)
+  const [bannersDesktop,  setBannersDesktop]  = useState(1)
+  const [bannersMobile,   setBannersMobile]   = useState(1)
+  const [savingConfig,    setSavingConfig]    = useState(false)
 
   async function load() {
     setLoading(true)
-    const res  = await fetch(`${SUPA_URL}/rest/v1/banners?order=sort_order`, { headers: h })
-    const data = await res.json()
-    setBanners(Array.isArray(data) ? data : [])
+    const [bannersRes, configRes] = await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/banners?order=sort_order`, { headers: h }).then(r => r.json()),
+      fetch(`${SUPA_URL}/rest/v1/site_config?key=in.(banners_desktop,banners_mobile)`, { headers: h }).then(r => r.json()),
+    ])
+    setBanners(Array.isArray(bannersRes) ? bannersRes : [])
+    if (Array.isArray(configRes)) {
+      setBannersDesktop(Number(configRes.find((c: any) => c.key === 'banners_desktop')?.value ?? 1))
+      setBannersMobile(Number(configRes.find((c: any) => c.key === 'banners_mobile')?.value ?? 1))
+    }
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  async function saveConfig(key: string, value: number) {
+    setSavingConfig(true)
+    await fetch(`${SUPA_URL}/rest/v1/site_config?key=eq.${key}`, {
+      method: 'PATCH', headers: h,
+      body: JSON.stringify({ value: String(value) }),
+    })
+    setSavingConfig(false)
+    toast.success('Настройки сохранены')
+  }
 
   async function toggleActive(b: Banner) {
     await fetch(`${SUPA_URL}/rest/v1/banners?id=eq.${b.id}`, {
@@ -55,12 +74,70 @@ export function BannerManager() {
     toast.success('Баннер удалён')
   }
 
-  function openAdd()          { setEditing(null); setShowForm(true) }
-  function openEdit(b: Banner){ setEditing(b);    setShowForm(true) }
-  function closeForm()        { setShowForm(false); setEditing(null); load() }
+  function openAdd()           { setEditing(null); setShowForm(true) }
+  function openEdit(b: Banner) { setEditing(b);    setShowForm(true) }
+  function closeForm()         { setShowForm(false); setEditing(null); load() }
 
   return (
     <div>
+      {/* Настройки отображения */}
+      <div className="bg-white rounded-card shadow-card p-4 mb-6">
+        <h3 className="font-semibold text-text-primary text-sm mb-4">Количество баннеров в ряд</h3>
+        <div className="flex gap-6 flex-wrap">
+
+          {/* Десктоп */}
+          <div className="flex items-center gap-3">
+            <Monitor size={18} className="text-text-muted flex-shrink-0" />
+            <span className="text-sm text-text-secondary">Десктоп</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4].map(n => (
+                <button key={n}
+                  onClick={() => {
+                    setBannersDesktop(n)
+                    saveConfig('banners_desktop', n)
+                  }}
+                  className={`w-9 h-9 rounded-btn text-sm font-semibold transition-colors
+                    ${bannersDesktop === n
+                      ? 'bg-brand text-white'
+                      : 'bg-surface-input text-text-secondary hover:text-brand'
+                    }`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Мобайл */}
+          <div className="flex items-center gap-3">
+            <Smartphone size={18} className="text-text-muted flex-shrink-0" />
+            <span className="text-sm text-text-secondary">Мобильный</span>
+            <div className="flex gap-1">
+              {[1, 2, 3].map(n => (
+                <button key={n}
+                  onClick={() => {
+                    setBannersMobile(n)
+                    saveConfig('banners_mobile', n)
+                  }}
+                  className={`w-9 h-9 rounded-btn text-sm font-semibold transition-colors
+                    ${bannersMobile === n
+                      ? 'bg-brand text-white'
+                      : 'bg-surface-input text-text-secondary hover:text-brand'
+                    }`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {savingConfig && (
+            <div className="flex items-center gap-1 text-text-muted text-xs">
+              <Loader2 size={12} className="animate-spin" /> Сохраняю...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Список баннеров */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-text-primary">Баннеры</h2>
@@ -140,7 +217,6 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    // Превью через FileReader — без конфликта с URL переменной
     const reader = new FileReader()
     reader.onload = ev => setPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
@@ -208,8 +284,6 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
         </div>
 
         <div className="p-5 space-y-4">
-
-          {/* Загрузка фото */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-2">
               Изображение или GIF
@@ -237,7 +311,6 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
             )}
           </div>
 
-          {/* Название */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Название <span className="text-text-muted text-xs">(необязательно)</span>
@@ -246,7 +319,6 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
               value={form.title} onChange={e => set('title', e.target.value)} />
           </div>
 
-          {/* Ссылка */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Ссылка при клике <span className="text-text-muted text-xs">(необязательно)</span>
@@ -255,14 +327,12 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
               value={form.link_url} onChange={e => set('link_url', e.target.value)} />
           </div>
 
-          {/* Порядок */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">Порядок</label>
             <input className="input" type="number" min="0"
               value={form.sort_order} onChange={e => set('sort_order', e.target.value)} />
           </div>
 
-          {/* Активен */}
           <label className="flex items-center gap-2 cursor-pointer">
             <div onClick={() => set('is_active', !form.is_active)}
               className={`w-10 h-6 rounded-full transition-colors relative

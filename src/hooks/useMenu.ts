@@ -15,12 +15,14 @@ interface Banner {
 }
 
 interface MenuData {
-  categories: Category[]
-  products:   Product[]
-  featured:   Product[]
-  banners:    Banner[]
-  isLoading:  boolean
-  error:      string | null
+  categories:     Category[]
+  products:       Product[]
+  featured:       Product[]
+  banners:        Banner[]
+  bannersDesktop: number
+  bannersMobile:  number
+  isLoading:      boolean
+  error:          string | null
 }
 
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -39,26 +41,31 @@ async function fetchTable<T>(table: string, params = ''): Promise<T[]> {
 }
 
 export function useMenu(): MenuData {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [products,   setProducts]   = useState<Product[]>([])
-  const [banners,    setBanners]    = useState<Banner[]>([])
-  const [isLoading,  setIsLoading]  = useState(true)
-  const [error,      setError]      = useState<string | null>(null)
+  const [categories,     setCategories]     = useState<Category[]>([])
+  const [products,       setProducts]       = useState<Product[]>([])
+  const [banners,        setBanners]        = useState<Banner[]>([])
+  const [bannersDesktop, setBannersDesktop] = useState(1)
+  const [bannersMobile,  setBannersMobile]  = useState(1)
+  const [isLoading,      setIsLoading]      = useState(true)
+  const [error,          setError]          = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       setIsLoading(true)
       setError(null)
       try {
-        const [cats, prods, bans] = await Promise.all([
+        const [cats, prods, bans, config] = await Promise.all([
           fetchTable<Category>('categories', 'is_visible=eq.true&order=sort_order'),
           fetchTable<Product>('products',    'is_visible=eq.true&order=sort_order'),
           fetchTable<Banner>('banners',      'is_active=eq.true&order=sort_order'),
+          fetchTable<{ key: string; value: string }>('site_config', 'key=in.(banners_desktop,banners_mobile)'),
         ])
 
         setCategories(cats)
         setProducts(prods.map(p => ({ ...p, final_price: calcFinalPrice(p) })))
         setBanners(bans)
+        setBannersDesktop(Number(config.find(c => c.key === 'banners_desktop')?.value ?? 1))
+        setBannersMobile(Number(config.find(c => c.key === 'banners_mobile')?.value ?? 1))
       } catch (e: any) {
         setError(e.message)
       } finally {
@@ -73,6 +80,8 @@ export function useMenu(): MenuData {
     products,
     featured: products.filter(p => p.is_featured),
     banners,
+    bannersDesktop,
+    bannersMobile,
     isLoading,
     error,
   }

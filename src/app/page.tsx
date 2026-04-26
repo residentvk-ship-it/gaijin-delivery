@@ -12,7 +12,7 @@ import { BannerCarousel } from '@/components/menu/BannerCarousel'
 import type { Product } from '@/types'
 
 export default function HomePage() {
-  const { categories, products, featured, banners, isLoading, error } = useMenu()
+  const { categories, products, featured, banners, bannersDesktop, bannersMobile, isLoading, error } = useMenu()
   const [activeSlug, setActiveSlug]           = useState<string>('')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isScrolling, setIsScrolling]         = useState(false)
@@ -99,7 +99,7 @@ export default function HomePage() {
             {/* Баннеры с акциями */}
              {banners.length > 0 && (
                 <div className="mt-4 mb-2">
-                  <BannerCarousel banners={banners} />
+                  <BannerCarousel banners={banners} bannersDesktop={bannersDesktop} bannersMobile={bannersMobile} />
                 </div>
               )}
 
