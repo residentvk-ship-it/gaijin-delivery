@@ -40,14 +40,6 @@ const FIELDS: {
       { key: 'min_order_time',     label: 'Минимальное время доставки', type: 'number', hint: 'В минутах' },
     ],
   },
-  {
-    group: 'Ресторан',
-    items: [
-      { key: 'restaurant_name',    label: 'Название'  },
-      { key: 'restaurant_phone',   label: 'Телефон'   },
-      { key: 'restaurant_address', label: 'Адрес'     },
-    ],
-  },
 ]
 
 export function SiteConfigManager() {
