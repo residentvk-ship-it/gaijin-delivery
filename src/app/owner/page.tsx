@@ -6,12 +6,12 @@ import { useState, useEffect } from 'react'
 import { Plus, Pencil, Eye, EyeOff, Trash2, Star } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { ProductForm } from '@/components/owner/ProductForm'
-import { BannerManager } from '@/components/owner/BannerManager'
 import { StatsPanel } from '@/components/owner/StatsPanel'
 import { PromoManager } from '@/components/owner/PromoManager'
 import { Clients } from '@/components/owner/clients'
 import { History } from '@/components/owner/history'
 import type { Product, Category } from '@/types'
+import { SiteConfigManager } from '@/components/owner/SiteConfigManager'
 
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -21,15 +21,15 @@ const h = {
   'Content-Type':  'application/json',
 }
 
-type Tab = 'products' | 'banners' | 'stats' | 'promos' | 'clients' | 'history'
+type Tab = 'products' | 'stats' | 'promos' | 'clients' | 'history' | 'config'
 
 const TAB_LABEL: Record<Tab, string> = {
   products: 'Меню',
-  banners:  'Баннеры',
   stats:    'Статистика',
   promos:   'Акции и Промокоды',
   clients:  'Клиенты',
   history:  'История заказов',
+  config:   'Переменные'
 }
 
 export default function OwnerPage() {
@@ -134,11 +134,11 @@ export default function OwnerPage() {
           ))}
         </div>
 
-        {tab === 'banners'  && <BannerManager />}
         {tab === 'clients'  && <Clients />}
         {tab === 'history'  && <History />}
         {tab === 'stats'    && <StatsPanel />}
         {tab === 'promos'   && <PromoManager />}
+        {tab === 'config' && <SiteConfigManager />}
 
         {/* Вкладка: Меню */}
         {tab === 'products' && (

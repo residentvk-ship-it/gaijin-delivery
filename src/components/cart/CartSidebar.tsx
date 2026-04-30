@@ -14,6 +14,7 @@ import Image from 'next/image'
 export function CartSidebar() {
   const { items, removeItem, updateQuantity, totalPrice } = useCartStore()
 
+  // промокод — скрыт визуально, логика сохранена для личного кабинета
   const [promoInput,   setPromoInput]   = useState('')
   const [promoCode,    setPromoCode]    = useState<PromoCode | null>(null)
   const [promoLoading, setPromoLoading] = useState(false)
@@ -52,7 +53,6 @@ export function CartSidebar() {
     window.location.href = '/checkout'
   }
 
-  // Пустая корзина
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-l-2xl shadow-[-4px_0_24px_rgba(0,0,0,0.1)] p-6 flex flex-col items-center gap-3 text-text-muted">
@@ -73,13 +73,12 @@ export function CartSidebar() {
         <span className="text-xs text-text-muted">{items.length} позиций</span>
       </div>
 
-      {/* Список — скроллится */}
+      {/* Список */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => {
           const price = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
           return (
-            <div key={product.id} className="flex gap-2 items-start">
-              {/* Фото */}
+            <div key={cartKey} className="flex gap-2 items-start">
               <div className="w-14 h-14 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
                 {product.image_url
                   ? <Image src={product.image_url} alt={product.name} width={56} height={56} className="w-full h-full object-cover" />
@@ -87,14 +86,20 @@ export function CartSidebar() {
                 }
               </div>
 
-              {/* Инфо */}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-text-primary line-clamp-2 leading-snug">
                   {product.name}
                 </p>
+
+                {/* Топпинги */}
+                {selectedToppings.length > 0 && (
+                  <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
+                    🧩 {selectedToppings.map(t => t.name).join(', ')}
+                  </p>
+                )}
+
                 <p className="text-xs text-text-muted mt-0.5">{formatPrice(price)}</p>
 
-                {/* Счётчик */}
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <button
                     onClick={() => updateQuantity(cartKey, quantity - 1)}
@@ -117,7 +122,6 @@ export function CartSidebar() {
                 </div>
               </div>
 
-              {/* Сумма + удалить */}
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 <p className="text-xs font-semibold text-text-primary">
                   {formatPrice(price * quantity)}
@@ -132,48 +136,15 @@ export function CartSidebar() {
         })}
       </div>
 
-      {/* Промокод + итог + кнопка */}
+      {/* Итог + кнопка */}
       <div className="border-t border-surface-border px-4 py-3 space-y-2.5">
-
-        {/* Промокод */}
-        {!promoCode ? (
-          <div className="flex gap-1.5">
-            <div className="relative flex-1">
-              <Tag size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                className="input pl-7 text-xs py-2"
-                placeholder="Промокод"
-                value={promoInput}
-                onChange={e => { setPromoInput(e.target.value); setPromoError('') }}
-                onKeyDown={e => e.key === 'Enter' && applyPromo()}
-              />
-            </div>
-            <button onClick={applyPromo} disabled={promoLoading}
-              className="btn-secondary px-3 text-xs flex items-center flex-shrink-0">
-              {promoLoading ? <Loader2 size={12} className="animate-spin" /> : 'OK'}
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-btn px-2.5 py-1.5">
-            <span className="text-xs text-green-700 font-medium">{promoCode.code}</span>
-            <button onClick={() => { setPromoCode(null); setPromoInput('') }}
-              className="text-green-600 hover:text-green-800">
-              <X size={12} />
-            </button>
+        {discount > 0 && (
+          <div className="flex justify-between text-xs text-green-600">
+            <span>Скидка</span><span>−{formatPrice(discount)}</span>
           </div>
         )}
-        {promoError && <p className="text-brand text-xs">{promoError}</p>}
-
-        {/* Итог */}
-        <div className="space-y-1">
-          {discount > 0 && (
-            <div className="flex justify-between text-xs text-green-600">
-              <span>Скидка</span><span>−{formatPrice(discount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-bold text-text-primary text-sm">
-            <span>Итого</span><span>{formatPrice(total)}</span>
-          </div>
+        <div className="flex justify-between font-bold text-text-primary text-sm">
+          <span>Итого</span><span>{formatPrice(total)}</span>
         </div>
 
         <button onClick={goToCheckout} className="btn-primary w-full py-2.5 text-sm">

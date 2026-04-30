@@ -8,6 +8,7 @@ import { useCartStore } from '@/store/cart'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import { AddressModal } from '@/components/cart/AddressModal'
+import { useCartMeta } from '@/hooks/useCartMeta'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
@@ -15,18 +16,15 @@ import Image from 'next/image'
 type DeliveryType = 'delivery' | 'pickup'
 type Page = 1 | 2
 
-// Пороги — заглушки, потом вынесем в site_config
-const FREE_DELIVERY_THRESHOLD = 500   // ₽ бесплатная доставка
-const GIFT_THRESHOLD          = 3000  // ₽ подарок
-
 function ProgressBar({
-  current, target, label, reachedLabel, color,
+  current, target, label, reachedLabel, color, deliveryCost,
 }: {
   current: number
   target: number
   label: (left: number) => string
   reachedLabel: string
   color: string
+  deliveryCost?: number
 }) {
   const reached = current >= target
   const pct     = Math.min((current / target) * 100, 100)
@@ -40,6 +38,9 @@ function ProgressBar({
           <span className="text-xs text-text-muted">{formatPrice(current)} / {formatPrice(target)}</span>
         )}
       </div>
+      {!reached && deliveryCost !== undefined && deliveryCost > 0 && (
+        <p className="text-xs text-text-muted">стоимость доставки: {formatPrice(deliveryCost)}</p>
+      )}
       <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${color}`}
@@ -58,14 +59,12 @@ export function CartDrawer() {
   const [address,       setAddress]       = useState('')
   const [showAddrModal, setShowAddrModal] = useState(false)
   const [persons,       setPersons]       = useState(1)
-  const [chopsticks,    setChopsticks]    = useState(0)
-  const [forks,         setForks]         = useState(0)
+  // промокод — скрыт визуально, логика сохранена для личного кабинета
   const [promoInput,    setPromoInput]    = useState('')
   const [promoCode,     setPromoCode]     = useState<PromoCode | null>(null)
   const [promoLoading,  setPromoLoading]  = useState(false)
   const [promoError,    setPromoError]    = useState('')
 
-  // Страница 2
   const [name,          setName]          = useState('')
   const [phone,         setPhone]         = useState('')
   const [comment,       setComment]       = useState('')
@@ -75,7 +74,7 @@ export function CartDrawer() {
   useEffect(() => {
     const isDesktop = window.innerWidth >= 640
     if (isOpen && isDesktop) {
-      document.body.style.marginRight = '384px'
+      document.body.style.marginRight = '512px'
       document.body.style.transition  = 'margin 0.3s ease'
     } else {
       document.body.style.marginRight = '0'
@@ -88,12 +87,8 @@ export function CartDrawer() {
   }, [isOpen])
 
   const subtotal = totalPrice()
-  const discount = promoCode
-    ? promoCode.discount_type === 'percent'
-      ? Math.round(subtotal * promoCode.discount_value / 100)
-      : promoCode.discount_value
-    : 0
-  const total = Math.max(0, subtotal - discount)
+  const { config, deliveryCost, isFreeDelivery, discount, total, leftForFree, leftForGift } =
+    useCartMeta({ subtotal, deliveryType, promoCode })
 
   async function applyPromo() {
     if (!promoInput.trim()) return
@@ -159,6 +154,7 @@ export function CartDrawer() {
       promo_code_id:  promoCode?.id ?? null,
       customer_name:  name.trim(),
       customer_phone: phone.trim(),
+      persons,
     }
     if (userId) payload.user_id = userId
 
@@ -198,7 +194,7 @@ export function CartDrawer() {
 
   return (
     <>
-      <div className={`fixed top-0 right-0 h-full z-40 w-full sm:w-96 bg-white
+      <div className={`fixed top-0 right-0 h-full z-40 w-full sm:w-[512px] bg-white
                        flex flex-col transition-transform duration-300 ease-in-out
                        shadow-[-4px_0_24px_rgba(0,0,0,0.08)]
                        ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -235,25 +231,25 @@ export function CartDrawer() {
             <div className="px-5 pt-4 pb-3 flex-shrink-0 space-y-3">
               <div className="flex rounded-btn overflow-hidden border border-surface-border">
                 {([
-                  { value: 'delivery', label: ' Доставка' },
-                  { value: 'pickup',   label: ' Самовывоз' },
+                  { value: 'delivery', label: 'Доставка' },
+                  { value: 'pickup',   label: 'Самовывоз' },
                 ] as const).map(({ value, label }) => (
                   <button key={value} onClick={() => setDeliveryType(value)}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors
+                    className={`flex-1 py-[11.6px] text-base font-bold transition-colors
                       ${deliveryType === value ? 'bg-brand text-white' : 'text-text-secondary hover:text-text-primary bg-white'}`}>
                     {label}
                   </button>
                 ))}
               </div>
 
-              {/* Бар 1 — бесплатная доставка (только для доставки) */}
               {deliveryType === 'delivery' && items.length > 0 && (
                 <ProgressBar
                   current={subtotal}
-                  target={FREE_DELIVERY_THRESHOLD}
+                  target={config.free_delivery_threshold}
                   label={left => `🚚 До бесплатной доставки ${formatPrice(left)}`}
                   reachedLabel="🚚 Бесплатная доставка!"
                   color="bg-brand"
+                  deliveryCost={deliveryCost}
                 />
               )}
             </div>
@@ -281,6 +277,14 @@ export function CartDrawer() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-text-primary line-clamp-2 leading-snug">{product.name}</p>
+
+                          {/* Топпинги */}
+                          {selectedToppings.length > 0 && (
+                            <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
+                              🧩 {selectedToppings.map(t => t.name).join(', ')}
+                            </p>
+                          )}
+
                           <p className="text-xs text-text-muted mt-0.5">{formatPrice(price)}</p>
                           <div className="flex items-center gap-2 mt-1.5">
                             <button onClick={() => updateQuantity(cartKey, quantity - 1)}
@@ -320,10 +324,10 @@ export function CartDrawer() {
                     </button>
                   )}
 
-                  {/* Бар 2 — подарок (под адресом) */}
+                  {/* Бар — подарок */}
                   <ProgressBar
                     current={subtotal}
-                    target={GIFT_THRESHOLD}
+                    target={config.gift_threshold}
                     label={left => `🎁 До подарка ${formatPrice(left)}`}
                     reachedLabel="🎁 Подарок добавлен!"
                     color="bg-green-500"
@@ -346,73 +350,8 @@ export function CartDrawer() {
                     </div>
                   </div>
 
-                  {/* Палочки */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-surface-section rounded-btn">
-                    <span className="text-base flex-shrink-0">🥢</span>
-                    <span className="text-sm text-text-secondary flex-1">Палочки</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setChopsticks(c => Math.max(0, c - 1))}
-                        className="w-6 h-6 rounded-full border border-surface-border text-text-secondary flex items-center justify-center hover:border-brand hover:text-brand transition-colors">
-                        <Minus size={10} />
-                      </button>
-                      <span className="text-sm font-semibold text-text-primary w-4 text-center">{chopsticks}</span>
-                      <button onClick={() => setChopsticks(c => c + 1)}
-                        className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light transition-colors">
-                        <Plus size={10} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Вилки */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-surface-section rounded-btn">
-                    <span className="text-base flex-shrink-0">🍴</span>
-                    <span className="text-sm text-text-secondary flex-1">Вилки и ложки</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setForks(f => Math.max(0, f - 1))}
-                        className="w-6 h-6 rounded-full border border-surface-border text-text-secondary flex items-center justify-center hover:border-brand hover:text-brand transition-colors">
-                        <Minus size={10} />
-                      </button>
-                      <span className="text-sm font-semibold text-text-primary w-4 text-center">{forks}</span>
-                      <button onClick={() => setForks(f => f + 1)}
-                        className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light transition-colors">
-                        <Plus size={10} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Промокод */}
-                  {!promoCode ? (
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                        <input className="input pl-8 text-sm" placeholder="Промокод"
-                          value={promoInput}
-                          onChange={e => { setPromoInput(e.target.value); setPromoError('') }}
-                          onKeyDown={e => e.key === 'Enter' && applyPromo()} />
-                      </div>
-                      <button onClick={applyPromo} disabled={promoLoading}
-                        className="btn-secondary px-4 text-sm flex items-center flex-shrink-0">
-                        {promoLoading ? <Loader2 size={14} className="animate-spin" /> : 'OK'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-btn px-3 py-2">
-                      <span className="text-sm text-green-700 font-medium">{promoCode.code}</span>
-                      <button onClick={() => { setPromoCode(null); setPromoInput('') }} className="text-green-600"><X size={14} /></button>
-                    </div>
-                  )}
-                  {promoError && <p className="text-brand text-xs">{promoError}</p>}
-
                   {/* Итог */}
                   <div className="space-y-1.5">
-                    <div className="flex justify-between text-sm text-text-secondary">
-                      <span>Подытог</span><span>{formatPrice(subtotal)}</span>
-                    </div>
-                    {discount > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Скидка</span><span>−{formatPrice(discount)}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between font-bold text-text-primary pt-1 border-t border-surface-border">
                       <span>Итого</span><span>{formatPrice(total)}</span>
                     </div>
@@ -475,12 +414,19 @@ export function CartDrawer() {
 
               <div className="bg-surface-section rounded-card p-4 space-y-1.5">
                 <p className="font-semibold text-text-primary text-sm mb-2">Ваш заказ</p>
-                {items.map(({ product, quantity }) => (
-                  <div key={product.id} className="flex justify-between text-sm">
-                    <span className="text-text-secondary line-clamp-1 flex-1">{product.name} × {quantity}</span>
-                    <span className="text-text-primary font-medium ml-2 flex-shrink-0">
-                      {formatPrice(calcFinalPrice(product) * quantity)}
-                    </span>
+                {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => (
+                  <div key={cartKey} className="space-y-0.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary line-clamp-1 flex-1">{product.name} × {quantity}</span>
+                      <span className="text-text-primary font-medium ml-2 flex-shrink-0">
+                        {formatPrice(calcFinalPrice(product) * quantity)}
+                      </span>
+                    </div>
+                    {selectedToppings.length > 0 && (
+                      <p className="text-xs text-text-muted line-clamp-1">
+                        🧩 {selectedToppings.map(t => t.name).join(', ')}
+                      </p>
+                    )}
                   </div>
                 ))}
                 <div className="flex justify-between font-bold text-text-primary pt-2 border-t border-surface-border mt-2">
