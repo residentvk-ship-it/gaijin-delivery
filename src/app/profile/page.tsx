@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Package, User, MapPin, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle } from 'lucide-react'
+import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order, OrderItemSnapshot } from '@/types'
@@ -31,34 +31,37 @@ type Tab = 'orders' | 'profile'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [tab,      setTab]      = useState<Tab>('orders')
-  const [orders,   setOrders]   = useState<Order[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [userId,   setUserId]   = useState<string | null>(null)
-  const [userName, setUserName] = useState<string>('')
+  const [tab,       setTab]       = useState<Tab>('orders')
+  const [orders,    setOrders]    = useState<Order[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [userId,    setUserId]    = useState<string | null>(null)
+  const [userName,  setUserName]  = useState<string>('')
   const [userEmail, setUserEmail] = useState<string>('')
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const [expanded,  setExpanded]  = useState<string | null>(null)
 
   const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
   useEffect(() => {
-    // Читаем сессию
-    try {
-      const raw = localStorage.getItem('sb-localhost-auth-token')
-      if (!raw) { router.replace('/auth/login'); return }
-      const session = JSON.parse(raw)
-      const uid  = session.user?.id
-      const name = session.user?.user_metadata?.name ?? ''
-      const email = session.user?.email ?? ''
-      if (!uid) { router.replace('/auth/login'); return }
+    async function init() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        router.replace('/auth/login')
+        return
+      }
+
+      const uid   = session.user.id
+      const name  = session.user.user_metadata?.name ?? ''
+      const email = session.user.email ?? ''
+
       setUserId(uid)
       setUserName(name)
       setUserEmail(email)
       loadOrders(uid, session.access_token)
-    } catch {
-      router.replace('/auth/login')
     }
+    init()
   }, [])
 
   // Realtime — обновляем статусы заказов
@@ -106,8 +109,8 @@ export default function ProfilePage() {
         {/* Вкладки */}
         <div className="max-w-lg mx-auto px-4 flex">
           {([
-            { value: 'orders',  label: '📦 Заказы',  icon: Package },
-            { value: 'profile', label: '👤 Профиль', icon: User    },
+            { value: 'orders',  label: '📦 Заказы'  },
+            { value: 'profile', label: '👤 Профиль' },
           ] as const).map(t => (
             <button key={t.value}
               onClick={() => setTab(t.value)}
@@ -141,20 +144,18 @@ export default function ProfilePage() {
               </div>
             ) : (
               orders.map(order => {
-                const items     = order.items as OrderItemSnapshot[]
+                const items      = order.items as OrderItemSnapshot[]
                 const isExpanded = expanded === order.id
-                const Icon      = STATUS_ICONS[order.status] ?? Clock
-                const isActive  = !['completed', 'cancelled'].includes(order.status)
+                const Icon       = STATUS_ICONS[order.status] ?? Clock
+                const isActive   = !['completed', 'cancelled'].includes(order.status)
 
                 return (
                   <div key={order.id} className="bg-white rounded-card shadow-card overflow-hidden">
 
-                    {/* Шапка заказа */}
                     <button
                       className="w-full flex items-center gap-3 p-4 hover:bg-surface-section transition-colors text-left"
                       onClick={() => setExpanded(isExpanded ? null : order.id)}
                     >
-                      {/* Иконка статуса */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
                         ${isActive ? 'bg-brand/10' : 'bg-surface-section'}`}>
                         <Icon size={18} className={isActive ? 'text-brand' : 'text-text-muted'} />
@@ -178,13 +179,12 @@ export default function ProfilePage() {
                         ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
 
-                    {/* Прогресс-бар для активных */}
                     {isActive && order.status !== 'new' && (
                       <div className="px-4 pb-3">
                         <div className="flex gap-1">
                           {['new','accepted','cooking','delivering','completed'].map((s, i, arr) => {
-                            const idx     = arr.indexOf(order.status)
-                            const filled  = i <= idx
+                            const idx    = arr.indexOf(order.status)
+                            const filled = i <= idx
                             return (
                               <div key={s} className={`h-1 flex-1 rounded-full transition-colors
                                 ${filled ? 'bg-brand' : 'bg-surface-border'}`} />
@@ -197,14 +197,11 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {/* Детали заказа */}
                     {isExpanded && (
                       <div className="border-t border-surface-border px-4 py-3 space-y-2">
                         {items.map((item, i) => (
                           <div key={i} className="flex justify-between text-sm">
-                            <span className="text-text-primary">
-                              {item.name} × {item.quantity}
-                            </span>
+                            <span className="text-text-primary">{item.name} × {item.quantity}</span>
                             <span className="text-text-secondary flex-shrink-0 ml-2">
                               {formatPrice(item.price_at_order * item.quantity)}
                             </span>
@@ -219,10 +216,7 @@ export default function ProfilePage() {
                           <p>💳 {order.payment_method === 'cash' ? 'Наличными' : 'Картой онлайн'}</p>
                           {order.comment && <p>💬 {order.comment}</p>}
                         </div>
-
-                        {/* Повторить заказ */}
-                        <a href="/"
-                          className="btn-secondary w-full text-center text-sm py-2 block mt-2">
+                        <a href="/" className="btn-secondary w-full text-center text-sm py-2 block mt-2">
                           🔄 Повторить заказ
                         </a>
                       </div>
@@ -248,8 +242,7 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Email</label>
-                <input className="input" value={userEmail} disabled
-                  className="input opacity-60 cursor-not-allowed" />
+                <input className="input opacity-60 cursor-not-allowed" value={userEmail} disabled />
               </div>
 
               <button className="btn-primary w-full py-2.5 text-sm">
@@ -283,7 +276,6 @@ export default function ProfilePage() {
               onClick={async () => {
                 const supabase = createClient()
                 await supabase.auth.signOut()
-                localStorage.removeItem('sb-localhost-auth-token')
                 router.push('/')
               }}
               className="w-full py-3 text-sm text-red-500 hover:text-red-600 transition-colors
