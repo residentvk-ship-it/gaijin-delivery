@@ -63,7 +63,7 @@ export default function LoginPage() {
               <input
                 className="input pl-9"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="mailru@example.ru"
                 value={form.email}
                 onChange={e => set('email', e.target.value)}
                 autoComplete="email"
