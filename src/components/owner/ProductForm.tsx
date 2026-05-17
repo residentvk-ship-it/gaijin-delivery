@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { X, Upload, Loader2, Plus, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import type { Product, Category, Badge, Topping } from '@/types'
+import type { Product, Category, Badge, Topping, ProductSize } from '@/types'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -34,6 +34,7 @@ export function ProductForm({ product, categories, onClose }: Props) {
   const [imageUrl,     setImageUrl]     = useState(product?.image_url ?? '')
   const [imagePreview, setImagePreview] = useState(product?.image_url ?? '')
   const [toppings,     setToppings]     = useState<Topping[]>(product?.toppings ?? [])
+  const [sizes,        setSizes]        = useState<ProductSize[]>(product?.sizes ?? [])
 
   const [form, setForm] = useState({
     name:             product?.name             ?? '',
@@ -76,6 +77,20 @@ export function ProductForm({ product, categories, onClose }: Props) {
     setToppings(t => t.filter(top => top.id !== id))
   }
 
+  // ── Размеры ───────────────────────────────────────────────────────────────
+
+  function addSize() {
+    setSizes(s => [...s, { id: genId(), name: '', price: 0 }])
+  }
+
+  function updateSize(id: string, field: keyof ProductSize, value: string | number) {
+    setSizes(s => s.map(sz => sz.id === id ? { ...sz, [field]: value } : sz))
+  }
+
+  function removeSize(id: string) {
+    setSizes(s => s.filter(sz => sz.id !== id))
+  }
+
   // ── Фото ──────────────────────────────────────────────────────────────────
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -107,6 +122,9 @@ export function ProductForm({ product, categories, onClose }: Props) {
     const invalidTopping = toppings.find(t => !t.name.trim())
     if (invalidTopping)   { toast.error('Заполните название топпинга'); return }
 
+    const invalidSize = sizes.find(s => !s.name.trim() || !s.price)
+    if (invalidSize)   { toast.error('Заполните название и цену размера'); return }
+
     setSaving(true)
 
     const payload = {
@@ -125,6 +143,7 @@ export function ProductForm({ product, categories, onClose }: Props) {
       sort_order:       Number(form.sort_order),
       image_url:        imageUrl || null,
       toppings:         toppings,
+      sizes:            sizes,
     }
 
     const { error } = product
@@ -255,6 +274,53 @@ export function ProductForm({ product, categories, onClose }: Props) {
               <label className="block text-sm font-medium text-text-primary mb-1.5">Скидка ₽</label>
               <input className="input" type="number" min="0" value={form.discount_fixed}
                 onChange={e => set('discount_fixed', e.target.value)} placeholder="100" />
+            </div>
+          </div>
+
+          {/* Размеры */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="block text-sm font-medium text-text-primary">Размеры</label>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Для пицц и блюд с выбором размера — кнопки появятся прямо на карточке
+                </p>
+              </div>
+              <button type="button" onClick={addSize}
+                className="flex items-center gap-1 text-xs text-brand hover:underline flex-shrink-0">
+                <Plus size={13} /> Добавить
+              </button>
+            </div>
+
+            {sizes.length === 0 && (
+              <p className="text-xs text-text-muted py-2">
+                Нет размеров — обычная карточка с одной кнопкой
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {sizes.map(sz => (
+                <div key={sz.id} className="flex gap-2 items-center">
+                  <input
+                    className="input flex-1"
+                    placeholder="Название (напр. 25 см / Маленькая)"
+                    value={sz.name}
+                    onChange={e => updateSize(sz.id, 'name', e.target.value)}
+                  />
+                  <input
+                    className="input w-24"
+                    type="number"
+                    min="0"
+                    placeholder="₽"
+                    value={sz.price}
+                    onChange={e => updateSize(sz.id, 'price', Number(e.target.value))}
+                  />
+                  <button type="button" onClick={() => removeSize(sz.id)}
+                    className="text-text-muted hover:text-brand transition-colors flex-shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 

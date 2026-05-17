@@ -107,7 +107,31 @@ export function CartDrawer() {
     toast.success('Промокод применён!')
   }
 
-  function goToPage2() {
+  async function goToPage2() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      toast((t) => (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-text-primary">Сначала войдите в аккаунт</p>
+          <div className="flex gap-2">
+            <a href="/auth/login"
+              className="flex-1 text-center text-xs font-semibold py-1.5 px-3 rounded-btn bg-brand text-white hover:bg-brand-light transition-colors"
+              onClick={() => toast.dismiss(t.id)}>
+              Войти
+            </a>
+            <a href="/auth/register"
+              className="flex-1 text-center text-xs font-semibold py-1.5 px-3 rounded-btn border border-brand text-brand hover:bg-red-50 transition-colors"
+              onClick={() => toast.dismiss(t.id)}>
+              Зарегистрироваться
+            </a>
+          </div>
+        </div>
+      ), { duration: 5000 })
+      return
+    }
+
     if (deliveryType === 'delivery' && !address.trim()) {
       toast.error('Укажите адрес доставки')
       return

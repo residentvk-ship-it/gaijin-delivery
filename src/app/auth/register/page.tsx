@@ -97,7 +97,7 @@ export default function RegisterPage() {
             </label>
             <div className="relative">
               <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input className="input pl-9" type="email" placeholder="you@example.com"
+              <input className="input pl-9" type="email" placeholder="mailru@example.ru"
                 value={form.email} onChange={e => set('email', e.target.value)}
                 autoComplete="email" />
             </div>

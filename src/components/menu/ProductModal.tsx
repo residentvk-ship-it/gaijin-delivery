@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { X, Plus, Minus, Check } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { cn, formatPrice, getBadgeConfig, getDiscountLabel } from '@/lib/utils'
-import type { Product, Topping } from '@/types'
+import type { Product, Topping, ProductSize } from '@/types'
 
 interface Props {
   product: Product | null
@@ -15,9 +15,15 @@ interface Props {
 export function ProductModal({ product, onClose }: Props) {
   const { items, addItem, updateQuantity } = useCartStore()
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([])
+  const [selectedSize,     setSelectedSize]     = useState<ProductSize | null>(null)
 
-  // Сбрасываем выбор топпингов при смене продукта
-  useEffect(() => { setSelectedToppings([]) }, [product?.id])
+  useEffect(() => {
+    if (!product) return
+    setSelectedToppings([])
+    // По умолчанию выбираем первый размер
+    const sizes = product.sizes ?? []
+    setSelectedSize(sizes.length > 0 ? sizes[0] : null)
+  }, [product?.id])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -33,14 +39,22 @@ export function ProductModal({ product, onClose }: Props) {
   if (!product) return null
 
   const toppings = product.toppings ?? []
+  const sizes    = product.sizes    ?? []
+  const hasSizes = sizes.length > 0
 
-  // Ключ текущей комбинации для поиска в корзине
-  const cartKey = [product.id, ...selectedToppings.map(t => t.id).sort()].join('::').replace(/::$/, '')
+  // Ключ для корзины
+  const cartKey = hasSizes && selectedSize
+    ? `${product.id}::size-${selectedSize.id}`
+    : [product.id, ...selectedToppings.map(t => t.id).sort()].join('::').replace(/::$/, '')
+
   const cartItem = items.find(i => i.cartKey === cartKey)
   const quantity = cartItem?.quantity ?? 0
 
-  const basePrice  = product.final_price ?? product.price
-  const hasDiscount = basePrice < product.price
+  const basePrice = hasSizes && selectedSize
+    ? selectedSize.price
+    : (product.final_price ?? product.price)
+
+  const hasDiscount = !hasSizes && basePrice < product.price
   const toppingsExtra = selectedToppings.reduce((s, t) => s + t.price, 0)
   const finalPrice = basePrice + toppingsExtra
 
@@ -48,6 +62,16 @@ export function ProductModal({ product, onClose }: Props) {
     setSelectedToppings(prev =>
       prev.find(x => x.id === t.id) ? prev.filter(x => x.id !== t.id) : [...prev, t]
     )
+  }
+
+  function handleAdd() {
+    if (hasSizes && selectedSize) {
+      const sizeProduct = { ...product, price: selectedSize.price, final_price: selectedSize.price }
+      const sizeTopping = [{ id: `size-${selectedSize.id}`, name: selectedSize.name, price: 0 }]
+      addItem(sizeProduct, sizeTopping)
+    } else {
+      addItem(product, selectedToppings)
+    }
   }
 
   return (
@@ -62,12 +86,10 @@ export function ProductModal({ product, onClose }: Props) {
       >
         {/* Фото */}
         <div className="relative">
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90
                        text-text-primary flex items-center justify-center
-                       hover:bg-white transition-colors shadow-sm border border-surface-border"
-          >
+                       hover:bg-white transition-colors shadow-sm border border-surface-border">
             <X size={16} />
           </button>
           <div className="relative aspect-[4/3] bg-surface-input overflow-hidden rounded-t-2xl sm:rounded-t-card">
@@ -114,6 +136,32 @@ export function ProductModal({ product, onClose }: Props) {
             </p>
           )}
 
+          {/* Выбор размера */}
+          {hasSizes && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-text-primary">Размер</p>
+              <div className="grid grid-cols-3 gap-2">
+                {sizes.map(sz => (
+                  <button
+                    key={sz.id}
+                    onClick={() => setSelectedSize(sz)}
+                    className={cn(
+                      'flex flex-col items-center px-3 py-2.5 rounded-btn border text-sm transition-colors',
+                      selectedSize?.id === sz.id
+                        ? 'border-brand bg-red-50 text-brand'
+                        : 'border-surface-border hover:border-brand/50 text-text-secondary'
+                    )}
+                  >
+                    <span className="font-semibold text-xs">{sz.name}</span>
+                    <span className={cn('text-xs mt-0.5', selectedSize?.id === sz.id ? 'text-brand' : 'text-text-muted')}>
+                      {formatPrice(sz.price)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Топпинги */}
           {toppings.length > 0 && (
             <div className="space-y-2">
@@ -122,17 +170,13 @@ export function ProductModal({ product, onClose }: Props) {
                 {toppings.map(t => {
                   const selected = !!selectedToppings.find(x => x.id === t.id)
                   return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleTopping(t)}
+                    <button key={t.id} type="button" onClick={() => toggleTopping(t)}
                       className={cn(
                         'w-full flex items-center justify-between px-3 py-2 rounded-btn border text-sm transition-colors',
                         selected
                           ? 'border-brand bg-red-50 text-text-primary'
                           : 'border-surface-border hover:border-brand/50 text-text-secondary'
-                      )}
-                    >
+                      )}>
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           'w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0',
@@ -167,10 +211,7 @@ export function ProductModal({ product, onClose }: Props) {
             </div>
 
             {quantity === 0 ? (
-              <button
-                onClick={() => addItem(product, selectedToppings)}
-                className="btn-primary flex items-center gap-2"
-              >
+              <button onClick={handleAdd} className="btn-primary flex items-center gap-2">
                 <Plus size={16} /> В корзину
               </button>
             ) : (
@@ -185,7 +226,7 @@ export function ProductModal({ product, onClose }: Props) {
                 </button>
                 <span className="text-text-primary font-bold text-lg w-5 text-center">{quantity}</span>
                 <button
-                  onClick={() => addItem(product, selectedToppings)}
+                  onClick={handleAdd}
                   className="w-9 h-9 rounded-full bg-brand hover:bg-brand-light
                              text-white flex items-center justify-center transition-colors"
                 >

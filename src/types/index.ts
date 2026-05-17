@@ -22,6 +22,12 @@ export interface Topping {
   price: number   // 0 = бесплатно / убрать ингредиент
 }
 
+export interface ProductSize {
+  id:    string   // генерируется при создании
+  name:  string   // "25 см", "30 см", "35 см"
+  price: number   // финальная цена за этот размер
+}
+
 export interface Product {
   id: string
   category_id: string
@@ -37,8 +43,10 @@ export interface Product {
   discount_fixed: number | null
   calories: number | null
   allergens: string[]
-  toppings: Topping[]       // доступные опции для этого блюда
+  toppings: Topping[]         // доступные опции для этого блюда
+  sizes: ProductSize[]        // размеры (для пицц и т.п.)
   final_price?: number
+  sort_order?: number
 }
 
 // ─── Корзина ──────────────────────────────────────────────────────────────────
