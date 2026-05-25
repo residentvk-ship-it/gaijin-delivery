@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import { AddressModal } from '@/components/cart/AddressModal'
 import { useCartMeta } from '@/hooks/useCartMeta'
+import { usePizzaGift, PIZZA_CAT_ID } from '@/hooks/usePizzaGift'
+import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
@@ -89,6 +91,13 @@ export function CartDrawer() {
   const subtotal = totalPrice()
   const { config, deliveryCost, isFreeDelivery, discount, total, leftForFree, leftForGift } =
     useCartMeta({ subtotal, deliveryType, promoCode })
+
+  const giftState = usePizzaGift({
+    items,
+    subtotal,
+    giftThreshold:     config.gift_threshold,
+    margheritaProduct: null,
+  })
 
   async function applyPromo() {
     if (!promoInput.trim()) return
@@ -356,6 +365,9 @@ export function CartDrawer() {
                     reachedLabel="🎁 Подарок добавлен!"
                     color="bg-green-500"
                   />
+
+                  {/* Подарок */}
+                  <GiftSelector giftState={giftState} />
 
                   {/* Персоны */}
                   <div className="flex items-center gap-2 px-3 py-2 bg-surface-section rounded-btn">
