@@ -56,17 +56,17 @@ export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct
       !(i.product.id === MARGHERITA_ID && i.product.price === 0)
     )
 
-    const hasPizzaDeal = pizzaItems.length >= 2
+    const pizzaCount   = pizzaItems.reduce((s, i) => s + i.quantity, 0)
+    const hasPizzaDeal = pizzaCount >= 2
 
     // Считаем размер подарочной пиццы
     let giftPizzaSize: string | null = null
     if (hasPizzaDeal) {
-      // Берём размеры всех пицц из selectedToppings (там хранится size-)
-      const sizes = pizzaItems.map(i => {
+      // Берём размеры всех пицц с учётом quantity
+      const sizes = pizzaItems.flatMap(i => {
         const sizeTopping = i.selectedToppings.find(t => t.id.startsWith('size-'))
-        if (!sizeTopping) return 40 // если нет размера — считаем 40
-        const name = sizeTopping.name
-        return SIZE_VALUES[name] ?? 40
+        const sizeVal = sizeTopping ? (SIZE_VALUES[sizeTopping.name] ?? 40) : 40
+        return Array(i.quantity).fill(sizeVal)
       })
 
       const minSize = Math.min(...sizes)

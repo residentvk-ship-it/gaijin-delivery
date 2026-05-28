@@ -10,6 +10,7 @@ import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import { AddressModal } from '@/components/cart/AddressModal'
 import { useCartMeta } from '@/hooks/useCartMeta'
 import { usePizzaGift, PIZZA_CAT_ID } from '@/hooks/usePizzaGift'
+import { useBirthdayDiscount } from '@/hooks/useBirthdayDiscount'
 import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
@@ -98,6 +99,8 @@ export function CartDrawer() {
     giftThreshold:     config.gift_threshold,
     margheritaProduct: null,
   })
+
+  const birthday = useBirthdayDiscount(subtotal)
 
   async function applyPromo() {
     if (!promoInput.trim()) return
@@ -388,8 +391,30 @@ export function CartDrawer() {
 
                   {/* Итог */}
                   <div className="space-y-1.5">
+                    {discount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Скидка (промокод)</span><span>−{formatPrice(discount)}</span>
+                      </div>
+                    )}
+                    {birthday.isActive && (
+                      <div className="flex justify-between text-sm text-pink-500">
+                        <span>🎂 День рождения −{birthday.pct}%</span>
+                        <span>−{formatPrice(birthday.discountAmount)}</span>
+                      </div>
+                    )}
+                    {deliveryCost > 0 && (
+                      <div className="flex justify-between text-sm text-text-secondary">
+                        <span>Доставка</span><span>{formatPrice(deliveryCost)}</span>
+                      </div>
+                    )}
+                    {deliveryCost === 0 && deliveryType === 'delivery' && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Доставка</span><span>Бесплатно</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold text-text-primary pt-1 border-t border-surface-border">
-                      <span>Итого</span><span>{formatPrice(total)}</span>
+                      <span>Итого</span>
+                      <span>{formatPrice(Math.max(0, total - birthday.discountAmount))}</span>
                     </div>
                   </div>
 
