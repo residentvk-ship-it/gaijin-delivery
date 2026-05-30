@@ -74,6 +74,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
 
   // зоны доставки
   const [zones,       setZones]       = useState<DeliveryZone[]>([])
+  const zonesRef                      = useRef<DeliveryZone[]>([])
   const [activeZone,  setActiveZone]  = useState<DeliveryZone | null>(null)
   const [outOfZone,   setOutOfZone]   = useState(false)
   const [lastCoords,  setLastCoords]  = useState<[number, number] | null>(null)
@@ -90,7 +91,11 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
       .select('*')
       .then(({ data, error }) => {
         if (error) console.error('Ошибка загрузки зон:', error)
-        else setZones((data as DeliveryZone[]) ?? [])
+        else {
+          const list = (data as DeliveryZone[]) ?? []
+          setZones(list)
+          zonesRef.current = list
+        }
       })
   }, [])
 
@@ -99,7 +104,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     if (typeof window === 'undefined') return
     if ((window as any).ymaps) { initMap((window as any).ymaps); return }
 
-    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
     const script = document.createElement('script')
     script.src = `https://api-maps.yandex.ru/2.1/?apikey=${key}&lang=ru_RU`
     script.onload = () => {
@@ -150,7 +155,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
   }
 
   function checkZone(coords: [number, number]) {
-    const zone = findZone(coords, zones)
+    const zone = findZone(coords, zonesRef.current)
     if (zone) {
       setActiveZone(zone)
       setOutOfZone(false)
@@ -171,7 +176,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
 
   async function reverseGeocode(coords: [number, number]) {
     try {
-      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
       const res  = await fetch(
         `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${coords[1]},${coords[0]}&format=json&lang=ru_RU&results=1`
       )
@@ -191,7 +196,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     setSearching(true)
     setSuggests([])
     try {
-      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
       const res  = await fetch(
         `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${encodeURIComponent(search + ' Фёдоровское Ленинградская область')}&format=json&lang=ru_RU&results=5`
       )
