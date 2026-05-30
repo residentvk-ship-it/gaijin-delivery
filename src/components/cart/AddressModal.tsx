@@ -99,7 +99,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     if (typeof window === 'undefined') return
     if ((window as any).ymaps) { initMap((window as any).ymaps); return }
 
-    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
+    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
     const script = document.createElement('script')
     script.src = `https://api-maps.yandex.ru/2.1/?apikey=${key}&lang=ru_RU`
     script.onload = () => {
@@ -171,7 +171,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
 
   async function reverseGeocode(coords: [number, number]) {
     try {
-      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
+      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
       const res  = await fetch(
         `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${coords[1]},${coords[0]}&format=json&lang=ru_RU&results=1`
       )
@@ -191,7 +191,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     setSearching(true)
     setSuggests([])
     try {
-      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
+      const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
       const res  = await fetch(
         `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${encodeURIComponent(search + ' Фёдоровское Ленинградская область')}&format=json&lang=ru_RU&results=5`
       )
