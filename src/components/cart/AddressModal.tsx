@@ -132,8 +132,8 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     if (!mapRef.current || mapInstance.current) return
 
     const map = new ymaps.Map(mapRef.current, {
-      center:   [59.6804, 30.4275], // Павловск
-      zoom:     12,
+      center:   [59.664845, 30.531739],
+      zoom:     13,
       controls: ['zoomControl'],
     })
 
@@ -193,10 +193,15 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     try {
       const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
       const res  = await fetch(
-        `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${encodeURIComponent(search)}&format=json&lang=ru_RU&results=5`
+        `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${encodeURIComponent(search + ' Фёдоровское Ленинградская область')}&format=json&lang=ru_RU&results=5`
       )
       const data = await res.json()
       const members = data?.response?.GeoObjectCollection?.featureMember ?? []
+      if (members.length === 0) {
+        setSuggests([{ title: 'Ничего не найдено', subtitle: 'Попробуйте другой запрос', value: '', coords: [59.664845, 30.531739] }])
+        setSearching(false)
+        return
+      }
       const list: Suggestion[] = members.map((m: any) => {
         const obj = m.GeoObject
         const pos = obj.Point.pos.split(' ').map(Number)
@@ -208,7 +213,9 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
         }
       })
       setSuggests(list)
-    } catch {}
+    } catch (e) {
+      console.error('Ошибка поиска:', e)
+    }
     setSearching(false)
   }
 
@@ -241,7 +248,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-2xl shadow-modal overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl w-full max-w-3xl shadow-modal overflow-hidden flex flex-col"
         style={{ maxHeight: '90dvh' }}
         onClick={e => e.stopPropagation()}
       >
