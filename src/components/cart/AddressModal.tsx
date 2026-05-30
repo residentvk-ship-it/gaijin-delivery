@@ -1,13 +1,23 @@
-// Модалка ввода адреса: Яндекс Карты + поиск + поля улица, дом, квартира, подъезд, этаж.
-
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, MapPin, Search, Check, Loader2 } from 'lucide-react'
+import { X, MapPin, Search, Check, Loader2, AlertTriangle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+// ─── типы ────────────────────────────────────────────────────────────────────
+
+interface DeliveryZone {
+  id: string
+  name: string
+  polygon: Array<{ lat: number; lng: number }>
+  min_order: number
+  delivery_price: number
+  delivery_time_min: number
+}
 
 interface Props {
   value:     string
-  onConfirm: (address: string) => void
+  onConfirm: (address: string, zone: DeliveryZone) => void
   onClose:   () => void
 }
 
@@ -17,6 +27,33 @@ interface Suggestion {
   value:    string
   coords:   [number, number]
 }
+
+// ─── ray-casting: точка внутри полигона? ─────────────────────────────────────
+
+function isPointInPolygon(
+  point: { lat: number; lng: number },
+  polygon: Array<{ lat: number; lng: number }>
+): boolean {
+  let inside = false
+  const { lat: py, lng: px } = point
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const { lat: iy, lng: ix } = polygon[i]
+    const { lat: jy, lng: jx } = polygon[j]
+    const intersect = iy > py !== jy > py && px < ((jx - ix) * (py - iy)) / (jy - iy) + ix
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+function findZone(
+  coords: [number, number],
+  zones: DeliveryZone[]
+): DeliveryZone | null {
+  const point = { lat: coords[0], lng: coords[1] }
+  return zones.find(z => isPointInPolygon(point, z.polygon)) ?? null
+}
+
+// ─── компонент ───────────────────────────────────────────────────────────────
 
 export function AddressModal({ value, onConfirm, onClose }: Props) {
   const mapRef      = useRef<HTMLDivElement>(null)
@@ -35,11 +72,29 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
   const [entrance, setEntrance] = useState('')
   const [floor,    setFloor]    = useState('')
 
+  // зоны доставки
+  const [zones,       setZones]       = useState<DeliveryZone[]>([])
+  const [activeZone,  setActiveZone]  = useState<DeliveryZone | null>(null)
+  const [outOfZone,   setOutOfZone]   = useState(false)
+  const [lastCoords,  setLastCoords]  = useState<[number, number] | null>(null)
+
   useEffect(() => {
     if (value) setStreet(value)
   }, [value])
 
-  // Загружаем Яндекс Карты
+  // ── загружаем зоны из Supabase ────────────────────────────────────────────
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('delivery_zones')
+      .select('*')
+      .then(({ data, error }) => {
+        if (error) console.error('Ошибка загрузки зон:', error)
+        else setZones((data as DeliveryZone[]) ?? [])
+      })
+  }, [])
+
+  // ── инициализация карты ───────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return
     if ((window as any).ymaps) { initMap((window as any).ymaps); return }
@@ -56,18 +111,37 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     document.head.appendChild(script)
   }, [])
 
+  // рисуем полигоны зон когда карта И зоны готовы
+  useEffect(() => {
+    if (!mapInstance.current || zones.length === 0) return
+    const ymaps = ymapsRef.current || (window as any).ymaps
+    zones.forEach(zone => {
+      const coords = zone.polygon.map(p => [p.lat, p.lng])
+      const poly = new ymaps.Polygon([coords], { hintContent: zone.name }, {
+        fillColor:   '#5B6EF520',
+        strokeColor: '#5B6EF5',
+        strokeWidth: 2,
+        fillOpacity: 0.3,
+        interactivityModel: 'default#transparent',
+      })
+      mapInstance.current.geoObjects.add(poly)
+    })
+  }, [zones, mapReady])
+
   function initMap(ymaps: any) {
     if (!mapRef.current || mapInstance.current) return
 
     const map = new ymaps.Map(mapRef.current, {
-      center: [59.9343, 30.3351], // Санкт-Петербург
-      zoom:   10,
+      center:   [59.6804, 30.4275], // Павловск
+      zoom:     12,
       controls: ['zoomControl'],
     })
 
     map.events.add('click', async (e: any) => {
       const coords = e.get('coords') as [number, number]
+      setLastCoords(coords)
       placeMarker(coords)
+      checkZone(coords)
       await reverseGeocode(coords)
     })
 
@@ -75,13 +149,22 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     setMapReady(true)
   }
 
+  function checkZone(coords: [number, number]) {
+    const zone = findZone(coords, zones)
+    if (zone) {
+      setActiveZone(zone)
+      setOutOfZone(false)
+    } else {
+      setActiveZone(null)
+      setOutOfZone(true)
+    }
+  }
+
   function placeMarker(coords: [number, number]) {
     const ymaps = ymapsRef.current || (window as any).ymaps
     if (!mapInstance.current || !ymaps) return
     if (markerRef.current) mapInstance.current.geoObjects.remove(markerRef.current)
-    const placemark = new ymaps.Placemark(coords, {}, {
-      preset: 'islands#redDotIcon',
-    })
+    const placemark = new ymaps.Placemark(coords, {}, { preset: 'islands#redDotIcon' })
     mapInstance.current.geoObjects.add(placemark)
     markerRef.current = placemark
   }
@@ -103,7 +186,6 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     } catch {}
   }
 
-  // Поиск через Suggest API
   async function handleSearch() {
     if (!search.trim()) return
     setSearching(true)
@@ -116,8 +198,8 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
       const data = await res.json()
       const members = data?.response?.GeoObjectCollection?.featureMember ?? []
       const list: Suggestion[] = members.map((m: any) => {
-        const obj    = m.GeoObject
-        const pos    = obj.Point.pos.split(' ').map(Number)
+        const obj = m.GeoObject
+        const pos = obj.Point.pos.split(' ').map(Number)
         return {
           title:    obj.name,
           subtitle: obj.description ?? '',
@@ -133,20 +215,24 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
   function selectSuggestion(s: Suggestion) {
     setSuggests([])
     setSearch('')
+    setLastCoords(s.coords)
     placeMarker(s.coords)
     mapInstance.current?.setCenter(s.coords, 17)
+    checkZone(s.coords)
     reverseGeocode(s.coords)
   }
 
   function handleConfirm() {
-    if (!street.trim()) return
+    if (!street.trim() || !activeZone) return
     const parts = [street.trim()]
     if (building.trim()) parts.push(`д. ${building.trim()}`)
     if (apt.trim())      parts.push(`кв. ${apt.trim()}`)
     if (entrance.trim()) parts.push(`подъезд ${entrance.trim()}`)
     if (floor.trim())    parts.push(`этаж ${floor.trim()}`)
-    onConfirm(parts.join(', '))
+    onConfirm(parts.join(', '), activeZone)
   }
+
+  const canConfirm = street.trim() && activeZone
 
   return (
     <div
@@ -183,14 +269,9 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
             />
             <button onClick={handleSearch} disabled={searching}
               className="btn-primary px-4 flex items-center gap-1 flex-shrink-0 text-sm">
-              {searching
-                ? <Loader2 size={14} className="animate-spin" />
-                : <Search size={14} />
-              }
+              {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
             </button>
           </div>
-
-          {/* Подсказки */}
           {suggests.length > 0 && (
             <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-card
                             shadow-modal border border-surface-border z-10 overflow-hidden">
@@ -214,6 +295,33 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Статус зоны */}
+        {outOfZone && (
+          <div className="mx-5 mt-3 flex items-center gap-2 bg-red-50 border border-red-200
+                          text-red-600 text-sm rounded-xl px-4 py-3 flex-shrink-0">
+            <AlertTriangle size={16} className="flex-shrink-0" />
+            <span>Адрес вне зоны доставки. Выберите другую точку на карте.</span>
+          </div>
+        )}
+        {activeZone && (
+          <div className="mx-5 mt-3 grid grid-cols-3 gap-2 flex-shrink-0">
+            <div className="bg-violet-50 rounded-xl py-2 text-center">
+              <p className="text-violet-700 font-semibold text-sm">
+                {activeZone.delivery_price === 0 ? 'Бесплатно' : `${activeZone.delivery_price} ₽`}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Доставка</p>
+            </div>
+            <div className="bg-violet-50 rounded-xl py-2 text-center">
+              <p className="text-violet-700 font-semibold text-sm">{activeZone.delivery_time_min} мин</p>
+              <p className="text-xs text-gray-500 mt-0.5">Время</p>
+            </div>
+            <div className="bg-violet-50 rounded-xl py-2 text-center">
+              <p className="text-violet-700 font-semibold text-sm">{activeZone.min_order} ₽</p>
+              <p className="text-xs text-gray-500 mt-0.5">Мин. заказ</p>
+            </div>
+          </div>
+        )}
 
         {/* Поля */}
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
@@ -254,8 +362,11 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
             </div>
           </div>
 
-          <button onClick={handleConfirm} disabled={!street.trim()}
-            className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+          <button
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+          >
             <Check size={16} />
             Подтвердить адрес
           </button>
