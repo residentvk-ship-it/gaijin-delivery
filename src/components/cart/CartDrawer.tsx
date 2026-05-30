@@ -518,7 +518,7 @@ export function CartDrawer() {
       {showAddrModal && (
         <AddressModal
           value={address}
-          onConfirm={addr, zone => { setAddress(addr); setShowAddrModal(false) }}
+          onConfirm={(addr, zone) => { setAddress(addr); setShowAddrModal(false) }}
           onClose={() => setShowAddrModal(false)}
         />
       )}
