@@ -300,7 +300,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
         </div>
 
         {/* Карта */}
-        <div ref={mapRef} className="w-full flex-shrink-0" style={{ height: '220px' }}>
+        <div ref={mapRef} className="w-full flex-shrink-0" style={{ height: '320px' }}>
           {!mapReady && (
             <div className="w-full h-full flex items-center justify-center bg-surface-input">
               <Loader2 size={24} className="animate-spin text-text-muted" />
@@ -314,24 +314,6 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
                           text-red-600 text-sm rounded-xl px-4 py-3 flex-shrink-0">
             <AlertTriangle size={16} className="flex-shrink-0" />
             <span>Адрес вне зоны доставки. Выберите другую точку на карте.</span>
-          </div>
-        )}
-        {activeZone && (
-          <div className="mx-5 mt-3 grid grid-cols-3 gap-2 flex-shrink-0">
-            <div className="bg-violet-50 rounded-xl py-2 text-center">
-              <p className="text-violet-700 font-semibold text-sm">
-                {activeZone.delivery_price === 0 ? 'Бесплатно' : `${activeZone.delivery_price} ₽`}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">Доставка</p>
-            </div>
-            <div className="bg-violet-50 rounded-xl py-2 text-center">
-              <p className="text-violet-700 font-semibold text-sm">{activeZone.delivery_time_min} мин</p>
-              <p className="text-xs text-gray-500 mt-0.5">Время</p>
-            </div>
-            <div className="bg-violet-50 rounded-xl py-2 text-center">
-              <p className="text-violet-700 font-semibold text-sm">{activeZone.min_order} ₽</p>
-              <p className="text-xs text-gray-500 mt-0.5">Мин. заказ</p>
-            </div>
           </div>
         )}
 
