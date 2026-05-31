@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Eye, EyeOff, Trash2, Star } from 'lucide-react'
+import { Plus, Pencil, Eye, EyeOff, Trash2, Star, ChevronUp, ChevronDown } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { ProductForm } from '@/components/owner/ProductForm'
 import { StatsPanel } from '@/components/owner/StatsPanel'
@@ -76,12 +76,49 @@ export default function OwnerPage() {
     setProducts(prev => prev.filter(x => x.id !== id))
   }
 
+  // ── Сортировка стрелочками ─────────────────────────────────────────────────
+  async function moveProduct(productId: string, direction: 'up' | 'down') {
+    // Берём только блюда текущей категории в текущем порядке
+    const catProducts = products.filter(p => p.category_id === filterCat)
+    const idx = catProducts.findIndex(p => p.id === productId)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+
+    if (swapIdx < 0 || swapIdx >= catProducts.length) return
+
+    const a = catProducts[idx]
+    const b = catProducts[swapIdx]
+
+    // Меняем sort_order местами
+    const aOrder = a.sort_order ?? idx
+    const bOrder = b.sort_order ?? swapIdx
+
+    // Сохраняем в базу
+    await Promise.all([
+      fetch(`${URL}/rest/v1/products?id=eq.${a.id}`, {
+        method: 'PATCH', headers: h,
+        body: JSON.stringify({ sort_order: bOrder }),
+      }),
+      fetch(`${URL}/rest/v1/products?id=eq.${b.id}`, {
+        method: 'PATCH', headers: h,
+        body: JSON.stringify({ sort_order: aOrder }),
+      }),
+    ])
+
+    // Обновляем локально
+    setProducts(prev => prev.map(p => {
+      if (p.id === a.id) return { ...p, sort_order: bOrder }
+      if (p.id === b.id) return { ...p, sort_order: aOrder }
+      return p
+    }).sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0)))
+  }
+
   function openAdd()            { setEditProduct(null); setShowForm(true) }
   function openEdit(p: Product) { setEditProduct(p);    setShowForm(true) }
   function closeForm()          { setShowForm(false); setEditProduct(null); load() }
 
   const filtered   = filterCat === 'all' ? products : products.filter(p => p.category_id === filterCat)
   const getCatName = (id: string) => categories.find(c => c.id === id)?.name ?? '—'
+  const showArrows = filterCat !== 'all'
 
   return (
     <div className="min-h-screen bg-surface-section">
@@ -170,6 +207,13 @@ export default function OwnerPage() {
               })}
             </div>
 
+            {/* Подсказка */}
+            {filterCat === 'all' && (
+              <p className="text-xs text-text-muted mb-3">
+                💡 Выберите категорию чтобы изменить порядок блюд стрелочками
+              </p>
+            )}
+
             {/* Таблица */}
             {isLoading ? (
               <div className="space-y-2">
@@ -182,6 +226,7 @@ export default function OwnerPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-surface-border text-left">
+                      {showArrows && <th className="px-2 py-3 text-xs font-semibold text-text-muted uppercase w-12">Поряд.</th>}
                       <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase">Фото</th>
                       <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase">Название</th>
                       <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase hidden sm:table-cell">Категория</th>
@@ -191,10 +236,33 @@ export default function OwnerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(p => (
+                    {filtered.map((p, idx) => (
                       <tr key={p.id}
                         className={`border-b border-surface-border last:border-0 transition-colors
                           ${!p.is_visible ? 'opacity-50' : 'hover:bg-surface-section'}`}>
+
+                        {/* Стрелочки — только в режиме категории */}
+                        {showArrows && (
+                          <td className="px-2 py-2">
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                onClick={() => moveProduct(p.id, 'up')}
+                                disabled={idx === 0}
+                                className="p-0.5 rounded text-text-muted hover:text-brand disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <ChevronUp size={16} />
+                              </button>
+                              <button
+                                onClick={() => moveProduct(p.id, 'down')}
+                                disabled={idx === filtered.length - 1}
+                                className="p-0.5 rounded text-text-muted hover:text-brand disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <ChevronDown size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+
                         <td className="px-4 py-2">
                           <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
                             {p.image_url
@@ -243,7 +311,7 @@ export default function OwnerPage() {
                     ))}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-text-muted">
+                        <td colSpan={7} className="px-4 py-12 text-center text-text-muted">
                           Нет блюд в этой категории
                         </td>
                       </tr>
