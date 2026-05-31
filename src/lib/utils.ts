@@ -50,11 +50,11 @@ export function getDiscountLabel(original: number, final: number): string {
 // ─── Бейджи ───────────────────────────────────────────────────────────────────
 
 const BADGE_CONFIG: Record<Badge, { label: string; className: string }> = {
-  hit:   { label: '🔥 Хит',     className: 'bg-orange-500 text-white' },
-  new:   { label: '✨ Новинка', className: 'bg-green-500 text-white' },
-  spicy: { label: '🌶 Острое',  className: 'bg-red-600 text-white' },
+  hit:   { label: '🔥 Хит',     className: 'bg-orange-500 text-black' },
+  new:   { label: '✨ Новинка', className: 'bg-green-500 text-black' },
+  spicy: { label: '🌶 Острое',  className: 'bg-red-600 text-black' },
   sale:  { label: '% Скидка',   className: 'bg-yellow-500 text-black' },
-  vegan: { label: '🌿 Веган',   className: 'bg-emerald-600 text-white' },
+  vegan: { label: '🌿 Веган',   className: 'bg-emerald-600 text-black' },
 }
 
 export function getBadgeConfig(badge: Badge) {

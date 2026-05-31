@@ -92,7 +92,7 @@ export function ProductCard({ product, onClick }: Props) {
             {product.badges.slice(0, 2).map(badge => {
               const cfg = getBadgeConfig(badge)
               return (
-                <span key={badge} className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm', cfg.className)}>
+                <span key={badge} className={cn('text-xs font-bold px-2.5 py-1 rounded-full shadow-sm', cfg.className)}>
                   {cfg.label}
                 </span>
               )
@@ -121,7 +121,7 @@ export function ProductCard({ product, onClick }: Props) {
         {!hasSizes && (
           <div className="flex items-center justify-between mt-auto pt-2" onClick={e => e.stopPropagation()}>
             <div className="flex flex-col">
-              <span className="text-text-primary font-bold text-sm">{formatPrice(finalPrice)}</span>
+              <span className="text-text-primary font-bold text-base">{formatPrice(finalPrice)}</span>
               {hasDiscount && (
                 <span className="text-text-muted text-xs line-through">{formatPrice(product.price)}</span>
               )}
@@ -164,7 +164,7 @@ export function ProductCard({ product, onClick }: Props) {
                   <div className="flex-1 min-w-0">
                     <span className="text-xs text-text-secondary truncate">{sz.name}</span>
                   </div>
-                  <span className="text-xs font-semibold text-text-primary flex-shrink-0">
+                  <span className="text-sm font-semibold text-text-primary flex-shrink-0">
                     {formatPrice(sz.price)}
                   </span>
                   {qty === 0 ? (
