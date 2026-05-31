@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, MapPin, Search, Check, Loader2, AlertTriangle } from 'lucide-react'
+import { X, MapPin, Check, Loader2, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 // ─── типы ────────────────────────────────────────────────────────────────────
@@ -61,10 +61,10 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
   const markerRef   = useRef<any>(null)
   const ymapsRef    = useRef<any>(null)
 
-  const [search,    setSearch]    = useState('')
   const [suggests,  setSuggests]  = useState<Suggestion[]>([])
   const [searching, setSearching] = useState(false)
   const [mapReady,  setMapReady]  = useState(false)
+  const searchTimer                = useRef<any>(null)
 
   const [street,   setStreet]   = useState('')
   const [building, setBuilding] = useState('')
@@ -104,7 +104,7 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     if (typeof window === 'undefined') return
     if ((window as any).ymaps) { initMap((window as any).ymaps); return }
 
-    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+    const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_KEY
     const script = document.createElement('script')
     script.src = `https://api-maps.yandex.ru/2.1/?apikey=${key}&lang=ru_RU`
     script.onload = () => {
@@ -191,6 +191,45 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
     } catch {}
   }
 
+  async function handleStreetInput(val: string) {
+    setStreet(val)
+    setSuggests([])
+    if (!val.trim() || val.length < 2) return
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const key = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+        const res = await fetch(
+          `https://geocode-maps.yandex.ru/1.x/?apikey=${key}&geocode=${encodeURIComponent(val + ' Фёдоровское Ленинградская область')}&format=json&lang=ru_RU&results=5`
+        )
+        const data = await res.json()
+        const members = data?.response?.GeoObjectCollection?.featureMember ?? []
+        const list: Suggestion[] = members.map((m: any) => {
+          const obj = m.GeoObject
+          const pos = obj.Point.pos.split(' ').map(Number)
+          return {
+            title:    obj.name,
+            subtitle: obj.description ?? '',
+            value:    obj.name,
+            coords:   [pos[1], pos[0]] as [number, number],
+          }
+        })
+        setSuggests(list)
+      } catch (e) { console.error(e) }
+      setSearching(false)
+    }, 400)
+  }
+
+  function selectStreetSuggestion(s: Suggestion) {
+    setSuggests([])
+    setStreet(s.title)
+    placeMarker(s.coords)
+    mapInstance.current?.setCenter(s.coords, 17)
+    checkZone(s.coords)
+    reverseGeocode(s.coords)
+  }
+
   async function handleSearch() {
     if (!search.trim()) return
     setSearching(true)
@@ -269,38 +308,10 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
           </button>
         </div>
 
-        {/* Поиск */}
-        <div className="px-5 py-3 border-b border-surface-border relative flex-shrink-0">
-          <div className="flex gap-2">
-            <input
-              className="input text-sm"
-              placeholder="Начните вводить адрес..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            />
-            <button onClick={handleSearch} disabled={searching}
-              className="btn-primary px-4 flex items-center gap-1 flex-shrink-0 text-sm">
-              {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-            </button>
-          </div>
-          {suggests.length > 0 && (
-            <div className="absolute left-5 right-5 top-full mt-1 bg-white rounded-card
-                            shadow-modal border border-surface-border z-10 overflow-hidden">
-              {suggests.map((s, i) => (
-                <button key={i} onClick={() => selectSuggestion(s)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-surface-section
-                             transition-colors border-b border-surface-border last:border-0">
-                  <p className="text-sm text-text-primary font-medium">{s.title}</p>
-                  <p className="text-xs text-text-muted">{s.subtitle}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+
 
         {/* Карта */}
-        <div ref={mapRef} className="w-full flex-shrink-0" style={{ height: '320px' }}>
+        <div ref={mapRef} className="w-full flex-shrink-0" style={{ height: '380px' }}>
           {!mapReady && (
             <div className="w-full h-full flex items-center justify-center bg-surface-input">
               <Loader2 size={24} className="animate-spin text-text-muted" />
@@ -320,10 +331,27 @@ export function AddressModal({ value, onConfirm, onClose }: Props) {
         {/* Поля */}
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
+            <div className="col-span-2 relative">
               <label className="block text-xs text-text-secondary mb-1">Улица</label>
-              <input className="input text-sm" placeholder="ул. Невский пр."
-                value={street} onChange={e => setStreet(e.target.value)} />
+              <div className="relative flex items-center">
+                <input className="input text-sm pr-8" placeholder="Начните вводить улицу..."
+                  value={street}
+                  onChange={e => handleStreetInput(e.target.value)} />
+                {searching && <Loader2 size={13} className="absolute right-2.5 animate-spin text-text-muted" />}
+              </div>
+              {suggests.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-card
+                                shadow-modal border border-surface-border z-20 overflow-hidden">
+                  {suggests.map((s, i) => (
+                    <button key={i} onClick={() => selectStreetSuggestion(s)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-surface-section
+                                 transition-colors border-b border-surface-border last:border-0">
+                      <p className="text-sm text-text-primary font-medium">{s.title}</p>
+                      <p className="text-xs text-text-muted">{s.subtitle}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs text-text-secondary mb-1">Дом</label>
