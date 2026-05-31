@@ -66,6 +66,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             },
           }}
         />
+
+        {/* Футер */}
+        <footer className="mt-8 py-4 border-t border-surface-border">
+          <p className="text-center text-xs text-text-muted">
+            © {new Date().getFullYear()} Время Есть · Разработка:{' '}
+            <a href="mailto:residentvk@gmail.com"
+               className="hover:text-brand transition-colors">
+              residentvk@gmail.com
+            </a>
+          </p>
+        </footer>
+
       </body>
     </html>
   )
