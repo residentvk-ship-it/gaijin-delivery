@@ -1,5 +1,3 @@
-// Шапка сайта: логотип, телефон, профиль пользователя, корзина.
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -13,8 +11,42 @@ interface Profile {
   role: string
 }
 
+interface WorkingHours {
+  from: string  // "10:00"
+  to:   string  // "22:00"
+  isOpen: boolean
+}
+
+function useWorkingHours(): WorkingHours | null {
+  const [hours, setHours] = useState<WorkingHours | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('site_config')
+        .select('key, value')
+        .in('key', ['working_hours_from', 'working_hours_to', 'is_open'])
+
+      if (!data) return
+      const map: Record<string, string> = {}
+      for (const row of data) map[row.key] = row.value
+
+      const from   = map['working_hours_from'] ?? '10:00'
+      const to     = map['working_hours_to']   ?? '22:00'
+      const isOpen = map['is_open'] === 'true'
+
+      setHours({ from, to, isOpen })
+    }
+    load()
+  }, [])
+
+  return hours
+}
+
 export function Header() {
   const { totalItems, totalPrice, openCart } = useCartStore()
+  const workingHours = useWorkingHours()
 
   const [profile,  setProfile]  = useState<Profile | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -80,19 +112,25 @@ export function Header() {
           <img src="/logo.png" alt="Время есть" className="h-40 w-auto" />
         </a>
 
-        {/* Телефон */}
-        <a href="tel:+78124163535"
-           className="hidden sm:flex items-center gap-1.5 text-text-secondary hover:text-brand transition-colors">
-          <Phone size={16} />
-          <span className="text-base font-medium">8 (812) 416-35-35</span>
-        </a>
+        {/* Центр — телефон + время работы */}
+        <div className="hidden sm:flex flex-col items-center gap-0.5">
+          <a href="tel:+78124163535"
+            className="flex items-center gap-1.5 text-text-secondary hover:text-brand transition-colors">
+            <Phone size={16} />
+            <span className="text-base font-medium">8 <span className="text-sm">(812)</span> 416-35-35</span>
+          </a>
 
-        {/* Правая часть — только после монтирования */}
+          {workingHours && (
+            <span className="text-xs text-text-muted">
+              Доставка с {workingHours.from} до {workingHours.to}
+            </span>
+          )}
+        </div>
+
+        {/* Правая часть */}
         <div className="flex items-center gap-2">
-
           {mounted && (
             <>
-              {/* Профиль */}
               {profile ? (
                 <div className="relative">
                   <button
@@ -125,11 +163,11 @@ export function Header() {
                             <Settings size={15} /> Панель владельца
                           </a>
                         )}
-                          <a href="/profile"
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary
-                                        hover:bg-surface-section transition-colors">
-                            <User size={15} /> Мои заказы
-                          </a>
+                        <a href="/profile"
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary
+                                      hover:bg-surface-section transition-colors">
+                          <User size={15} /> Мои заказы
+                        </a>
                         <hr className="my-1 border-surface-border" />
                         <button
                           onClick={handleLogout}
