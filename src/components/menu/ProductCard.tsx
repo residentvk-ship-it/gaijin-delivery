@@ -92,7 +92,7 @@ export function ProductCard({ product, onClick }: Props) {
             {product.badges.slice(0, 2).map(badge => {
               const cfg = getBadgeConfig(badge)
               return (
-                <span key={badge} className={cn('text-xs font-bold px-2.5 py-1 rounded-full shadow-sm', cfg.className)}>
+                <span key={badge} className={cfg.className} style={cfg.style}>
                   {cfg.label}
                 </span>
               )

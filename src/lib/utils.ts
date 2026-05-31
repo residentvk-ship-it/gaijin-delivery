@@ -1,5 +1,6 @@
 // Вспомогательные утилиты: форматирование цен, работа с CSS-классами, вычисление скидок.
 
+import type React from 'react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { Product, Badge } from '@/types'
@@ -49,12 +50,12 @@ export function getDiscountLabel(original: number, final: number): string {
 
 // ─── Бейджи ───────────────────────────────────────────────────────────────────
 
-const BADGE_CONFIG: Record<Badge, { label: string; className: string }> = {
-  hit:   { label: '🔥 Хит',     className: 'bg-orange-500 text-black' },
-  new:   { label: '✨ Новинка', className: 'bg-green-500 text-black' },
-  spicy: { label: '🌶 Острое',  className: 'bg-red-600 text-black' },
-  sale:  { label: '% Скидка',   className: 'bg-yellow-500 text-black' },
-  vegan: { label: '🌿 Веган',   className: 'bg-emerald-600 text-black' },
+const BADGE_CONFIG: Record<Badge, { label: string; className: string; style: React.CSSProperties }> = {
+  hit:   { label: '🔥 Хит',     className: 'text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm', style: { background: '#f97316' } },
+  new:   { label: '✨ Новинка', className: 'text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm', style: { background: '#22c55e' } },
+  spicy: { label: '🌶 Острое',  className: 'text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm', style: { background: '#dc2626' } },
+  sale:  { label: '% Скидка',   className: 'text-black font-bold text-xs px-2.5 py-1 rounded-full shadow-sm', style: { background: '#eab308' } },
+  vegan: { label: '🌿 Веган',   className: 'text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm', style: { background: '#059669' } },
 }
 
 export function getBadgeConfig(badge: Badge) {
