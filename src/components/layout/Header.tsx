@@ -117,11 +117,11 @@ export function Header() {
           <a href="tel:+78124163535"
             className="flex items-center gap-1.5 text-text-secondary hover:text-brand transition-colors">
             <Phone size={16} />
-            <span className="text-base font-medium">8 <span className="text-sm">(812)</span> 416-35-35</span>
+            <span className="text-lg font-medium"> <span className="text-base">8(812)</span> 416-35-35</span>
           </a>
 
           {workingHours && (
-            <span className="text-xs text-text-muted">
+            <span className="text-sm text-text-muted">
               Доставка с {workingHours.from} до {workingHours.to}
             </span>
           )}
