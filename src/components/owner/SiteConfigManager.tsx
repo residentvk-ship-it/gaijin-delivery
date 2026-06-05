@@ -27,6 +27,8 @@ const FIELDS: {
     group: 'Акции',
     items: [
       { key: 'gift_threshold', label: 'Порог подарка (₽)', type: 'number' },
+      { key: 'pickup_discount',           label: 'Скидка на самовывоз (%)',    type: 'number' },
+      { key: 'birthday_discount_percent', label: 'Скидка на день рождения (%)', type: 'number' },
     ],
   },
   {

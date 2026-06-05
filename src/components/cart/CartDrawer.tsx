@@ -6,9 +6,8 @@ import { useCartStore } from '@/store/cart'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import { AddressModal } from '@/components/cart/AddressModal'
-import { useCartMeta } from '@/hooks/useCartMeta'
+import { useCartMeta, type BonusType } from '@/hooks/useCartMeta'
 import { usePizzaGift } from '@/hooks/usePizzaGift'
-import { useBirthdayDiscount } from '@/hooks/useBirthdayDiscount'
 import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
@@ -17,15 +16,10 @@ import Image from 'next/image'
 type DeliveryType = 'delivery' | 'pickup'
 type Page = 1 | 2
 
-function ProgressBar({
-  current, target, label, reachedLabel, color, deliveryCost,
-}: {
-  current: number
-  target: number
+function ProgressBar({ current, target, label, reachedLabel, color, deliveryCost }: {
+  current: number; target: number
   label: (left: number) => string
-  reachedLabel: string
-  color: string
-  deliveryCost?: number
+  reachedLabel: string; color: string; deliveryCost?: number
 }) {
   const reached = current >= target
   const pct     = Math.min((current / target) * 100, 100)
@@ -35,18 +29,13 @@ function ProgressBar({
         <span className={`text-xs font-medium ${reached ? 'text-green-600' : 'text-text-secondary'}`}>
           {reached ? reachedLabel : label(target - current)}
         </span>
-        {!reached && (
-          <span className="text-xs text-text-muted">{formatPrice(current)} / {formatPrice(target)}</span>
-        )}
+        {!reached && <span className="text-xs text-text-muted">{formatPrice(current)} / {formatPrice(target)}</span>}
       </div>
       {!reached && deliveryCost !== undefined && deliveryCost > 0 && (
         <p className="text-xs text-text-muted">стоимость доставки: {formatPrice(deliveryCost)}</p>
       )}
       <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -60,15 +49,13 @@ export function CartDrawer() {
   const [address,       setAddress]       = useState('')
   const [showAddrModal, setShowAddrModal] = useState(false)
   const [persons,       setPersons]       = useState(1)
-  const [promoInput,    setPromoInput]    = useState('')
   const [promoCode,     setPromoCode]     = useState<PromoCode | null>(null)
-  const [promoLoading,  setPromoLoading]  = useState(false)
-  const [promoError,    setPromoError]    = useState('')
   const [name,          setName]          = useState('')
   const [phone,         setPhone]         = useState('')
   const [comment,       setComment]       = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash')
   const [submitting,    setSubmitting]    = useState(false)
+  const [selectedBonus, setSelectedBonus] = useState<BonusType>(null)
 
   useEffect(() => {
     const isDesktop = window.innerWidth >= 640
@@ -81,44 +68,21 @@ export function CartDrawer() {
     return () => { document.body.style.marginRight = '0' }
   }, [isOpen])
 
-  useEffect(() => {
-    if (!isOpen) setPage(1)
-  }, [isOpen])
+  useEffect(() => { if (!isOpen) setPage(1) }, [isOpen])
 
   const subtotal = totalPrice()
-  const { config, deliveryCost, isFreeDelivery, discount, total, leftForFree, leftForGift } =
-    useCartMeta({ subtotal, deliveryType, promoCode })
+  const { config, deliveryCost, isFreeDelivery, discount, bonusDiscount, total } =
+    useCartMeta({ subtotal, deliveryType, promoCode, selectedBonus })
 
   const giftState = usePizzaGift({
-    items,
-    subtotal,
+    items, subtotal,
     giftThreshold:     config.gift_threshold,
     margheritaProduct: null,
   })
 
-  const birthday = useBirthdayDiscount(subtotal)
-
-  async function applyPromo() {
-    if (!promoInput.trim()) return
-    setPromoLoading(true)
-    setPromoError('')
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('promo_codes').select('*')
-      .eq('code', promoInput.trim().toUpperCase())
-      .eq('is_active', true).single()
-    setPromoLoading(false)
-    if (!data) { setPromoError('Промокод не найден'); return }
-    if (data.expires_at && new Date(data.expires_at) < new Date()) { setPromoError('Промокод истёк'); return }
-    if (data.usage_limit && data.used_count >= data.usage_limit) { setPromoError('Промокод исчерпан'); return }
-    setPromoCode(data as PromoCode)
-    toast.success('Промокод применён!')
-  }
-
   async function goToPage2() {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
-
     if (!session) {
       toast((t) => (
         <div className="flex flex-col gap-2">
@@ -126,100 +90,60 @@ export function CartDrawer() {
           <div className="flex gap-2">
             <a href="/auth/login"
               className="flex-1 text-center text-xs font-semibold py-1.5 px-3 rounded-btn bg-brand text-white hover:bg-brand-light transition-colors"
-              onClick={() => toast.dismiss(t.id)}>
-              Войти
-            </a>
+              onClick={() => toast.dismiss(t.id)}>Войти</a>
             <a href="/auth/register"
               className="flex-1 text-center text-xs font-semibold py-1.5 px-3 rounded-btn border border-brand text-brand hover:bg-red-50 transition-colors"
-              onClick={() => toast.dismiss(t.id)}>
-              Зарегистрироваться
-            </a>
+              onClick={() => toast.dismiss(t.id)}>Зарегистрироваться</a>
           </div>
         </div>
       ), { duration: 5000 })
       return
     }
-
-    if (deliveryType === 'delivery' && !address.trim()) {
-      toast.error('Укажите адрес доставки')
-      return
-    }
+    if (deliveryType === 'delivery' && !address.trim()) { toast.error('Укажите адрес доставки'); return }
     setPage(2)
   }
 
   async function handleSubmit() {
     if (!name.trim())  { toast.error('Введите имя');     return }
     if (!phone.trim()) { toast.error('Введите телефон'); return }
-
     setSubmitting(true)
 
     const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-
-    let token = ANON
-    let userId = null
+    let token = ANON, userId = null
     try {
       const raw = localStorage.getItem('sb-localhost-auth-token')
-      if (raw) {
-        const session = JSON.parse(raw)
-        token  = session.access_token
-        userId = session.user?.id
-      }
+      if (raw) { const s = JSON.parse(raw); token = s.access_token; userId = s.user?.id }
     } catch {}
 
     const orderItems = items.map(({ product, quantity }) => ({
-      product_id:     product.id,
-      name:           product.name,
-      price_at_order: calcFinalPrice(product),
-      quantity,
-      image_url:      product.image_url,
+      product_id: product.id, name: product.name,
+      price_at_order: calcFinalPrice(product), quantity, image_url: product.image_url,
     }))
 
     const payload: any = {
-      status:         'new',
-      items:          orderItems,
-      total,
-      address:        deliveryType === 'delivery' ? address.trim() : 'Самовывоз: Шоссейная ул., 4А, д. Фёдоровское',
-      comment:        comment.trim() || null,
-      payment_method: paymentMethod,
-      payment_status: 'pending',
-      promo_code_id:  promoCode?.id ?? null,
-      customer_name:  name.trim(),
-      customer_phone: phone.trim(),
-      persons,
+      status: 'new', items: orderItems, total,
+      address: deliveryType === 'delivery' ? address.trim() : 'Самовывоз: Шоссейная ул., 4А, д. Фёдоровское',
+      comment: comment.trim() || null,
+      payment_method: paymentMethod, payment_status: 'pending',
+      promo_code_id: promoCode?.id ?? null,
+      customer_name: name.trim(), customer_phone: phone.trim(), persons,
     }
     if (userId) payload.user_id = userId
 
     const res = await fetch(`${URL}/rest/v1/orders`, {
       method: 'POST',
-      headers: {
-        'apikey':        ANON,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=representation',
-      },
+      headers: { 'apikey': ANON, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
       body: JSON.stringify(payload),
     })
-
     setSubmitting(false)
-
-    if (!res.ok) {
-      const err = await res.text()
-      console.error(err)
-      toast.error('Ошибка оформления заказа')
-      return
-    }
-
+    if (!res.ok) { toast.error('Ошибка оформления заказа'); return }
     const [order] = await res.json()
     if (promoCode) {
       const supabase = createClient()
-      await supabase.from('promo_codes')
-        .update({ used_count: promoCode.used_count + 1 })
-        .eq('id', promoCode.id)
+      await supabase.from('promo_codes').update({ used_count: promoCode.used_count + 1 }).eq('id', promoCode.id)
     }
-
-    clearCart()
-    closeCart()
+    clearCart(); closeCart()
     toast.success('Заказ оформлен!')
     window.location.href = `/order/${order.id}`
   }
@@ -234,24 +158,21 @@ export function CartDrawer() {
         {/* Шапка */}
         <div className="flex items-center gap-2 px-5 py-4 border-b border-surface-border flex-shrink-0">
           {page === 2 && (
-            <button onClick={() => setPage(1)}
-              className="p-1.5 text-text-muted hover:text-brand transition-colors -ml-1">
+            <button onClick={() => setPage(1)} className="p-1.5 text-text-muted hover:text-brand transition-colors -ml-1">
               <ChevronLeft size={20} />
             </button>
           )}
           <h2 className="font-bold text-lg text-text-primary flex-1">
-            {page === 1 ? (
-              <>Мой заказ {items.length > 0 && <span className="text-sm font-normal text-text-muted ml-1">{items.length} позиций</span>}</>
-            ) : 'Оформление'}
+            {page === 1
+              ? <>Мой заказ {items.length > 0 && <span className="text-sm font-normal text-text-muted ml-1">{items.length} позиций</span>}</>
+              : 'Оформление'}
           </h2>
           <div className="flex items-center gap-1 mr-2">
             {[1,2].map(p => (
-              <div key={p} className={`w-2 h-2 rounded-full transition-colors
-                ${page === p ? 'bg-brand' : 'bg-surface-border'}`} />
+              <div key={p} className={`w-2 h-2 rounded-full transition-colors ${page === p ? 'bg-brand' : 'bg-surface-border'}`} />
             ))}
           </div>
-          <button onClick={closeCart}
-            className="p-1.5 text-text-muted hover:text-brand transition-colors">
+          <button onClick={closeCart} className="p-1.5 text-text-muted hover:text-brand transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -272,15 +193,11 @@ export function CartDrawer() {
                   </button>
                 ))}
               </div>
-
               {deliveryType === 'delivery' && items.length > 0 && (
                 <ProgressBar
-                  current={subtotal}
-                  target={config.free_delivery_threshold}
+                  current={subtotal} target={config.free_delivery_threshold}
                   label={left => `🚚 До бесплатной доставки ${formatPrice(left)}`}
-                  reachedLabel="🚚 Бесплатная доставка!"
-                  color="bg-brand"
-                  deliveryCost={deliveryCost}
+                  reachedLabel="🚚 Бесплатная доставка!" color="bg-brand" deliveryCost={deliveryCost}
                 />
               )}
             </div>
@@ -308,17 +225,14 @@ export function CartDrawer() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-text-primary line-clamp-2 leading-snug">
-                            {product.name}
-                            {isGift && <span className="ml-1 text-green-600">🎁</span>}
+                            {product.name}{isGift && <span className="ml-1 text-green-600">🎁</span>}
                           </p>
                           {selectedToppings.length > 0 && (
                             <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
                               🧩 {selectedToppings.map(t => t.name).join(', ')}
                             </p>
                           )}
-                          <p className="text-xs text-text-muted mt-0.5">
-                            {isGift ? 'Подарок' : formatPrice(price)}
-                          </p>
+                          <p className="text-xs text-text-muted mt-0.5">{isGift ? 'Подарок' : formatPrice(price)}</p>
                           <div className="flex items-center gap-2 mt-1.5">
                             <button onClick={() => updateQuantity(cartKey, quantity - 1)}
                               className="w-7 h-7 rounded-full border border-surface-border hover:border-brand hover:text-brand text-text-secondary flex items-center justify-center transition-colors">
@@ -334,9 +248,7 @@ export function CartDrawer() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <p className="text-sm font-semibold text-text-primary">
-                            {isGift ? '0 ₽' : formatPrice(price * quantity)}
-                          </p>
+                          <p className="text-sm font-semibold text-text-primary">{isGift ? '0 ₽' : formatPrice(price * quantity)}</p>
                           <button onClick={() => removeItem(cartKey)} className="text-text-muted hover:text-brand transition-colors">
                             <X size={14} />
                           </button>
@@ -349,7 +261,6 @@ export function CartDrawer() {
                 {/* Нижняя часть */}
                 <div className="border-t border-surface-border px-5 py-4 space-y-3 flex-shrink-0">
 
-                  {/* Адрес */}
                   {deliveryType === 'delivery' && (
                     <button onClick={() => setShowAddrModal(true)}
                       className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border hover:border-brand text-left transition-colors group">
@@ -371,17 +282,20 @@ export function CartDrawer() {
                     </div>
                   )}
 
-                  {/* Бар — подарок */}
                   <ProgressBar
-                    current={subtotal}
-                    target={config.gift_threshold}
+                    current={subtotal} target={config.gift_threshold}
                     label={left => `🎁 До подарка ${formatPrice(left)}`}
-                    reachedLabel="🎁 Подарок добавлен!"
-                    color="bg-green-500"
+                    reachedLabel="🎁 Подарок доступен!" color="bg-green-500"
                   />
 
-                  {/* Подарок */}
-                  <GiftSelector giftState={giftState} />
+                  <GiftSelector
+                    giftState={giftState}
+                    deliveryType={deliveryType}
+                    pickupDiscount={config.pickup_discount}
+                    birthdayDiscount={config.birthday_discount_percent}
+                    selectedBonus={selectedBonus}
+                    onBonusChange={setSelectedBonus}
+                  />
 
                   {/* Персоны */}
                   <div className="flex items-center gap-2 px-3 py-2 bg-surface-section rounded-btn">
@@ -404,13 +318,7 @@ export function CartDrawer() {
                   <div className="space-y-1.5">
                     {discount > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
-                        <span>Скидка (промокод)</span><span>−{formatPrice(discount)}</span>
-                      </div>
-                    )}
-                    {birthday.isActive && (
-                      <div className="flex justify-between text-sm text-pink-500">
-                        <span>🎂 День рождения −{birthday.pct}%</span>
-                        <span>−{formatPrice(birthday.discountAmount)}</span>
+                        <span>Скидка</span><span>−{formatPrice(discount)}</span>
                       </div>
                     )}
                     {deliveryCost > 0 && (
@@ -424,8 +332,7 @@ export function CartDrawer() {
                       </div>
                     )}
                     <div className="flex justify-between font-bold text-text-primary pt-1 border-t border-surface-border">
-                      <span>Итого</span>
-                      <span>{formatPrice(Math.max(0, total - birthday.discountAmount))}</span>
+                      <span>Итого</span><span>{formatPrice(total)}</span>
                     </div>
                   </div>
 
@@ -447,18 +354,15 @@ export function CartDrawer() {
                 <h3 className="font-semibold text-text-primary text-sm">Контактные данные</h3>
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">Имя *</label>
-                  <input className="input text-sm" placeholder="Иван"
-                    value={name} onChange={e => setName(e.target.value)} />
+                  <input className="input text-sm" placeholder="Иван" value={name} onChange={e => setName(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">Телефон *</label>
-                  <input className="input text-sm" placeholder="+7 (999) 000-00-00" type="tel"
-                    value={phone} onChange={e => setPhone(e.target.value)} />
+                  <input className="input text-sm" placeholder="+7 (999) 000-00-00" type="tel" value={phone} onChange={e => setPhone(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-xs text-text-secondary mb-1">Комментарий</label>
-                  <textarea className="input text-sm resize-none" rows={2}
-                    placeholder="Код домофона, пожелания..."
+                  <textarea className="input text-sm resize-none" rows={2} placeholder="Код домофона, пожелания..."
                     value={comment} onChange={e => setComment(e.target.value)} />
                 </div>
               </div>
@@ -467,16 +371,14 @@ export function CartDrawer() {
                 <h3 className="font-semibold text-text-primary text-sm">Способ оплаты</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: 'cash',   label: 'Наличными',  icon: Banknote,   desc: 'При получении' },
-                    { value: 'online', label: 'Картой',      icon: CreditCard, desc: 'Тинькофф' },
+                    { value: 'cash',   label: 'Наличными', icon: Banknote,   desc: 'При получении' },
+                    { value: 'online', label: 'Картой',     icon: CreditCard, desc: 'Тинькофф' },
                   ] as const).map(({ value, label, icon: Icon, desc }) => (
                     <button key={value} onClick={() => setPaymentMethod(value)}
                       className={`p-3 rounded-card border-2 text-left transition-all
                         ${paymentMethod === value ? 'border-brand bg-red-50' : 'border-surface-border hover:border-brand/40'}`}>
                       <Icon size={18} className={paymentMethod === value ? 'text-brand' : 'text-text-muted'} />
-                      <p className={`font-medium text-sm mt-1.5 ${paymentMethod === value ? 'text-brand' : 'text-text-primary'}`}>
-                        {label}
-                      </p>
+                      <p className={`font-medium text-sm mt-1.5 ${paymentMethod === value ? 'text-brand' : 'text-text-primary'}`}>{label}</p>
                       <p className="text-xs text-text-muted">{desc}</p>
                     </button>
                   ))}
@@ -494,12 +396,15 @@ export function CartDrawer() {
                       </span>
                     </div>
                     {selectedToppings.length > 0 && (
-                      <p className="text-xs text-text-muted line-clamp-1">
-                        🧩 {selectedToppings.map(t => t.name).join(', ')}
-                      </p>
+                      <p className="text-xs text-text-muted line-clamp-1">🧩 {selectedToppings.map(t => t.name).join(', ')}</p>
                     )}
                   </div>
                 ))}
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 pt-1">
+                    <span>Скидка</span><span>−{formatPrice(discount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-text-primary pt-2 border-t border-surface-border mt-2">
                   <span>Итого</span><span>{formatPrice(total)}</span>
                 </div>

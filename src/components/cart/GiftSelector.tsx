@@ -9,26 +9,43 @@ import {
   type GiftState,
 } from '@/hooks/usePizzaGift'
 import type { Product } from '@/types'
+import type { BonusType } from '@/hooks/useCartMeta'
 
 interface Props {
-  giftState: GiftState
+  giftState:      GiftState
+  deliveryType:   'delivery' | 'pickup'
+  pickupDiscount: number        // % из конфига
+  birthdayDiscount: number      // % из конфига
+  selectedBonus:  BonusType
+  onBonusChange:  (bonus: BonusType) => void
 }
 
 type GiftChoice = 'pizza' | string
 
-export function GiftSelector({ giftState }: Props) {
-  const { items, addItem, removeItem, updateQuantity } = useCartStore()
-  const [choice,     setChoice]     = useState<GiftChoice | null>(null)
-  const [margherita, setMargherita] = useState<Product | null>(null)
-  const [drinks,     setDrinks]     = useState<Product[]>([])
+export function GiftSelector({
+  giftState,
+  deliveryType,
+  pickupDiscount,
+  birthdayDiscount,
+  selectedBonus,
+  onBonusChange,
+}: Props) {
+  const { items, addItem, removeItem } = useCartStore()
+  const [giftChoice,  setGiftChoice]  = useState<GiftChoice | null>(null)
+  const [margherita,  setMargherita]  = useState<Product | null>(null)
+  const [drinks,      setDrinks]      = useState<Product[]>([])
 
   const {
-    hasPizzaDeal, giftPizzaSize, giftPizzaInCart,
+    hasPizzaDeal, giftPizzaSize,
     thresholdReached, canChooseDrink, canChoosePizza,
   } = giftState
 
+  const hasAnyGift = hasPizzaDeal || thresholdReached
+  const canPickup  = deliveryType === 'pickup' && pickupDiscount > 0
+  const canBirthday = birthdayDiscount > 0
+
   useEffect(() => {
-    if (!hasPizzaDeal && !thresholdReached) return
+    if (!hasAnyGift) return
     async function load() {
       const supabase = createClient()
       const [{ data: m }, { data: d }] = await Promise.all([
@@ -39,14 +56,14 @@ export function GiftSelector({ giftState }: Props) {
       if (d) setDrinks(d as Product[])
     }
     load()
-  }, [hasPizzaDeal, thresholdReached])
+  }, [hasAnyGift])
 
   useEffect(() => {
-    if (!hasPizzaDeal && !thresholdReached) {
+    if (!hasAnyGift) {
       removeGiftFromCart()
-      setChoice(null)
+      setGiftChoice(null)
     }
-  }, [hasPizzaDeal, thresholdReached])
+  }, [hasAnyGift])
 
   function removeGiftFromCart() {
     const giftPizza = items.find(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
@@ -57,95 +74,107 @@ export function GiftSelector({ giftState }: Props) {
     })
   }
 
-  function isGiftAlreadyInCart(newChoice: GiftChoice): boolean {
-    if (newChoice === 'pizza') {
-      return items.some(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
-    }
-    return items.some(i => i.product.id === newChoice && i.product.price === 0)
+  function isGiftAlreadyInCart(choice: GiftChoice): boolean {
+    if (choice === 'pizza') return items.some(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
+    return items.some(i => i.product.id === choice && i.product.price === 0)
   }
 
-  function selectGift(newChoice: GiftChoice) {
+  function selectGiftItem(newChoice: GiftChoice) {
     if (!margherita) return
-
-    // Если тот же подарок уже выбран — ничего не делаем
-    if (choice === newChoice && isGiftAlreadyInCart(newChoice)) return
-
+    if (giftChoice === newChoice && isGiftAlreadyInCart(newChoice)) return
     removeGiftFromCart()
-    setChoice(newChoice)
+    setGiftChoice(newChoice)
+    onBonusChange(null) // сбрасываем скидку если выбрали подарок
 
     if (newChoice === 'pizza' && giftPizzaSize) {
       const sz = MARGHERITA_SIZES[giftPizzaSize]
       if (!sz) return
-      const giftProduct: Product = { ...margherita, price: 0, final_price: 0 }
-      addItem(giftProduct, [{ id: `size-${sz.id}`, name: sz.name, price: 0 }])
+      addItem({ ...margherita, price: 0, final_price: 0 }, [{ id: `size-${sz.id}`, name: sz.name, price: 0 }])
     } else {
       const drink = drinks.find(d => d.id === newChoice)
       if (!drink) return
-      const giftProduct: Product = { ...drink, price: 0, final_price: 0 }
-      addItem(giftProduct, [])
+      addItem({ ...drink, price: 0, final_price: 0 }, [])
     }
-
-    // Гарантируем что подарок всегда в количестве 1
-    setTimeout(() => {
-      const key = newChoice === 'pizza'
-        ? items.find(i => i.product.id === MARGHERITA_ID && i.product.price === 0)?.cartKey
-        : items.find(i => i.product.id === newChoice && i.product.price === 0)?.cartKey
-      if (key) updateQuantity(key, 1)
-    }, 50)
   }
 
-  if (!hasPizzaDeal && !thresholdReached) return null
+  function selectDiscount(bonus: BonusType) {
+    // Сбрасываем подарок из корзины если выбрали скидку
+    removeGiftFromCart()
+    setGiftChoice(null)
+    onBonusChange(selectedBonus === bonus ? null : bonus)
+  }
+
+  // Показываем блок если есть хоть один вариант
+  if (!hasAnyGift && !canPickup && !canBirthday) return null
 
   return (
     <div className="bg-green-50 border border-green-200 rounded-btn px-3 py-2.5 space-y-2">
       <div className="flex items-center gap-2">
         <Gift size={14} className="text-green-600 flex-shrink-0" />
         <p className="text-xs font-semibold text-green-700">
-          {canChoosePizza
-            ? 'Выберите подарок — пицца или напиток!'
-            : hasPizzaDeal
-              ? 'Подарок — Маргарита!'
-              : 'Выберите подарок!'
-          }
+          Выберите бонус — применяется один:
         </p>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
+
+        {/* Подарочная пицца */}
         {hasPizzaDeal && giftPizzaSize && (
           <button
-            onClick={() => selectGift('pizza')}
+            onClick={() => selectGiftItem('pizza')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs font-medium border transition-colors
-              ${choice === 'pizza'
+              ${giftChoice === 'pizza' && !selectedBonus
                 ? 'bg-green-600 text-white border-green-600'
-                : 'bg-white text-green-700 border-green-300 hover:border-green-500'
-              }`}
+                : 'bg-white text-green-700 border-green-300 hover:border-green-500'}`}
           >
-            {choice === 'pizza' && <Check size={11} />}
+            {giftChoice === 'pizza' && !selectedBonus && <Check size={11} />}
             🍕 Маргарита {giftPizzaSize} см
           </button>
         )}
 
+        {/* Напитки */}
         {canChooseDrink && drinks.map(drink => (
           <button
             key={drink.id}
-            onClick={() => selectGift(drink.id)}
+            onClick={() => selectGiftItem(drink.id)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs font-medium border transition-colors
-              ${choice === drink.id
+              ${giftChoice === drink.id && !selectedBonus
                 ? 'bg-green-600 text-white border-green-600'
-                : 'bg-white text-green-700 border-green-300 hover:border-green-500'
-              }`}
+                : 'bg-white text-green-700 border-green-300 hover:border-green-500'}`}
           >
-            {choice === drink.id && <Check size={11} />}
+            {giftChoice === drink.id && !selectedBonus && <Check size={11} />}
             🥤 {drink.name}
           </button>
         ))}
-      </div>
 
-      {hasPizzaDeal && !thresholdReached && !choice && giftPizzaSize && margherita && (
-        <p className="text-xs text-green-600">
-          🍕 Маргарита {giftPizzaSize} см добавлена в подарок
-        </p>
-      )}
+        {/* Скидка на самовывоз */}
+        {canPickup && (
+          <button
+            onClick={() => selectDiscount('pickup')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs font-medium border transition-colors
+              ${selectedBonus === 'pickup'
+                ? 'bg-green-600 text-white border-green-600'
+                : 'bg-white text-green-700 border-green-300 hover:border-green-500'}`}
+          >
+            {selectedBonus === 'pickup' && <Check size={11} />}
+            🛍 Скидка {pickupDiscount}% за самовывоз
+          </button>
+        )}
+
+        {/* Скидка на день рождения */}
+        {canBirthday && (
+          <button
+            onClick={() => selectDiscount('birthday')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs font-medium border transition-colors
+              ${selectedBonus === 'birthday'
+                ? 'bg-green-600 text-white border-green-600'
+                : 'bg-white text-green-700 border-green-300 hover:border-green-500'}`}
+          >
+            {selectedBonus === 'birthday' && <Check size={11} />}
+            🎂 Скидка {birthdayDiscount}% на день рождения
+          </button>
+        )}
+      </div>
     </div>
   )
 }
