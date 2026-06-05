@@ -14,20 +14,19 @@ interface Props {
   giftState: GiftState
 }
 
-type GiftChoice = 'pizza' | string  // 'pizza' или id напитка
+type GiftChoice = 'pizza' | string
 
 export function GiftSelector({ giftState }: Props) {
-  const { items, addItem, removeItem } = useCartStore()
-  const [choice,    setChoice]    = useState<GiftChoice | null>(null)
+  const { items, addItem, removeItem, updateQuantity } = useCartStore()
+  const [choice,     setChoice]     = useState<GiftChoice | null>(null)
   const [margherita, setMargherita] = useState<Product | null>(null)
-  const [drinks,     setDrinks]    = useState<Product[]>([])
+  const [drinks,     setDrinks]     = useState<Product[]>([])
 
   const {
     hasPizzaDeal, giftPizzaSize, giftPizzaInCart,
     thresholdReached, canChooseDrink, canChoosePizza,
   } = giftState
 
-  // Загружаем продукты для подарков
   useEffect(() => {
     if (!hasPizzaDeal && !thresholdReached) return
     async function load() {
@@ -42,7 +41,6 @@ export function GiftSelector({ giftState }: Props) {
     load()
   }, [hasPizzaDeal, thresholdReached])
 
-  // Если условия больше не выполняются — убираем подарок
   useEffect(() => {
     if (!hasPizzaDeal && !thresholdReached) {
       removeGiftFromCart()
@@ -51,38 +49,51 @@ export function GiftSelector({ giftState }: Props) {
   }, [hasPizzaDeal, thresholdReached])
 
   function removeGiftFromCart() {
-    // Убираем подарочную маргариту
     const giftPizza = items.find(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
     if (giftPizza) removeItem(giftPizza.cartKey)
-
-    // Убираем подарочные напитки
     DRINK_GIFTS.forEach(g => {
       const giftDrink = items.find(i => i.product.id === g.id && i.product.price === 0)
       if (giftDrink) removeItem(giftDrink.cartKey)
     })
   }
 
+  function isGiftAlreadyInCart(newChoice: GiftChoice): boolean {
+    if (newChoice === 'pizza') {
+      return items.some(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
+    }
+    return items.some(i => i.product.id === newChoice && i.product.price === 0)
+  }
+
   function selectGift(newChoice: GiftChoice) {
     if (!margherita) return
+
+    // Если тот же подарок уже выбран — ничего не делаем
+    if (choice === newChoice && isGiftAlreadyInCart(newChoice)) return
+
     removeGiftFromCart()
     setChoice(newChoice)
 
     if (newChoice === 'pizza' && giftPizzaSize) {
       const sz = MARGHERITA_SIZES[giftPizzaSize]
       if (!sz) return
-      // Добавляем маргариту с ценой 0
       const giftProduct: Product = { ...margherita, price: 0, final_price: 0 }
       addItem(giftProduct, [{ id: `size-${sz.id}`, name: sz.name, price: 0 }])
     } else {
-      // Добавляем напиток с ценой 0
       const drink = drinks.find(d => d.id === newChoice)
       if (!drink) return
       const giftProduct: Product = { ...drink, price: 0, final_price: 0 }
       addItem(giftProduct, [])
     }
+
+    // Гарантируем что подарок всегда в количестве 1
+    setTimeout(() => {
+      const key = newChoice === 'pizza'
+        ? items.find(i => i.product.id === MARGHERITA_ID && i.product.price === 0)?.cartKey
+        : items.find(i => i.product.id === newChoice && i.product.price === 0)?.cartKey
+      if (key) updateQuantity(key, 1)
+    }, 50)
   }
 
-  // Ничего не показываем если нет акций
   if (!hasPizzaDeal && !thresholdReached) return null
 
   return (
@@ -100,8 +111,6 @@ export function GiftSelector({ giftState }: Props) {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-
-        {/* Кнопка пиццы — всегда если 2+ пицц */}
         {hasPizzaDeal && giftPizzaSize && (
           <button
             onClick={() => selectGift('pizza')}
@@ -116,7 +125,6 @@ export function GiftSelector({ giftState }: Props) {
           </button>
         )}
 
-        {/* Напитки — только если достигнут порог */}
         {canChooseDrink && drinks.map(drink => (
           <button
             key={drink.id}
@@ -133,7 +141,6 @@ export function GiftSelector({ giftState }: Props) {
         ))}
       </div>
 
-      {/* Автоматически добавляем маргариту если только пицца-акция без порога */}
       {hasPizzaDeal && !thresholdReached && !choice && giftPizzaSize && margherita && (
         <p className="text-xs text-green-600">
           🍕 Маргарита {giftPizzaSize} см добавлена в подарок
