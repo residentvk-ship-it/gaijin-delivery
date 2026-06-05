@@ -1,9 +1,7 @@
-// Корзина как прилипший элемент страницы — видна справа на десктопе при скролле.
-
 'use client'
 
 import { useState } from 'react'
-import { Plus, Minus, Trash2, ShoppingBag, Tag, Loader2, X } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingBag, X } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, calcFinalPrice } from '@/lib/utils'
@@ -14,7 +12,6 @@ import Image from 'next/image'
 export function CartSidebar() {
   const { items, removeItem, updateQuantity, totalPrice } = useCartStore()
 
-  // промокод — скрыт визуально, логика сохранена для личного кабинета
   const [promoInput,   setPromoInput]   = useState('')
   const [promoCode,    setPromoCode]    = useState<PromoCode | null>(null)
   const [promoLoading, setPromoLoading] = useState(false)
@@ -77,6 +74,7 @@ export function CartSidebar() {
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => {
           const price = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
+          const isGift = product.price === 0
           return (
             <div key={cartKey} className="flex gap-2 items-start">
               <div className="w-14 h-14 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
@@ -89,16 +87,18 @@ export function CartSidebar() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-text-primary line-clamp-2 leading-snug">
                   {product.name}
+                  {isGift && <span className="ml-1 text-green-600">🎁</span>}
                 </p>
 
-                {/* Топпинги */}
                 {selectedToppings.length > 0 && (
                   <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
                     🧩 {selectedToppings.map(t => t.name).join(', ')}
                   </p>
                 )}
 
-                <p className="text-xs text-text-muted mt-0.5">{formatPrice(price)}</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {isGift ? 'Подарок' : formatPrice(price)}
+                </p>
 
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <button
@@ -113,9 +113,11 @@ export function CartSidebar() {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => updateQuantity(cartKey, quantity + 1)}
+                    onClick={() => !isGift && updateQuantity(cartKey, quantity + 1)}
+                    disabled={isGift}
                     className="w-6 h-6 rounded-full bg-brand hover:bg-brand-light
-                               text-white flex items-center justify-center transition-colors"
+                               text-white flex items-center justify-center transition-colors
+                               disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Plus size={10} />
                   </button>
@@ -124,7 +126,7 @@ export function CartSidebar() {
 
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 <p className="text-xs font-semibold text-text-primary">
-                  {formatPrice(price * quantity)}
+                  {isGift ? '0 ₽' : formatPrice(price * quantity)}
                 </p>
                 <button onClick={() => removeItem(cartKey)}
                   className="text-text-muted hover:text-brand transition-colors">

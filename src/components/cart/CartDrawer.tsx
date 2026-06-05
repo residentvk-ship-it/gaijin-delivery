@@ -1,15 +1,13 @@
-// Выдвижная корзина: две страницы — товары+адрес, затем данные+оплата.
-
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Plus, Minus, Trash2, Tag, Loader2, ShoppingBag, MapPin, Users, ChevronRight, ChevronLeft, CreditCard, Banknote, Check } from 'lucide-react'
+import { X, Plus, Minus, Trash2, Loader2, ShoppingBag, MapPin, Users, ChevronRight, ChevronLeft, CreditCard, Banknote, Check } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import { AddressModal } from '@/components/cart/AddressModal'
 import { useCartMeta } from '@/hooks/useCartMeta'
-import { usePizzaGift, PIZZA_CAT_ID } from '@/hooks/usePizzaGift'
+import { usePizzaGift } from '@/hooks/usePizzaGift'
 import { useBirthdayDiscount } from '@/hooks/useBirthdayDiscount'
 import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
@@ -62,12 +60,10 @@ export function CartDrawer() {
   const [address,       setAddress]       = useState('')
   const [showAddrModal, setShowAddrModal] = useState(false)
   const [persons,       setPersons]       = useState(1)
-  // промокод — скрыт визуально, логика сохранена для личного кабинета
   const [promoInput,    setPromoInput]    = useState('')
   const [promoCode,     setPromoCode]     = useState<PromoCode | null>(null)
   const [promoLoading,  setPromoLoading]  = useState(false)
   const [promoError,    setPromoError]    = useState('')
-
   const [name,          setName]          = useState('')
   const [phone,         setPhone]         = useState('')
   const [comment,       setComment]       = useState('')
@@ -183,7 +179,7 @@ export function CartDrawer() {
       status:         'new',
       items:          orderItems,
       total,
-      address:        deliveryType === 'delivery' ? address.trim() : 'Самовывоз',
+      address:        deliveryType === 'delivery' ? address.trim() : 'Самовывоз: Шоссейная ул., 4А, д. Фёдоровское',
       comment:        comment.trim() || null,
       payment_method: paymentMethod,
       payment_status: 'pending',
@@ -224,7 +220,7 @@ export function CartDrawer() {
 
     clearCart()
     closeCart()
-    toast.success('Заказ оформлен! ')
+    toast.success('Заказ оформлен!')
     window.location.href = `/order/${order.id}`
   }
 
@@ -263,7 +259,6 @@ export function CartDrawer() {
         {/* ═══ СТРАНИЦА 1 ═══ */}
         {page === 1 && (
           <>
-            {/* Переключатель + бар доставки */}
             <div className="px-5 pt-4 pb-3 flex-shrink-0 space-y-3">
               <div className="flex rounded-btn overflow-hidden border border-surface-border">
                 {([
@@ -290,7 +285,6 @@ export function CartDrawer() {
               )}
             </div>
 
-            {/* Пустая */}
             {items.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 text-text-muted p-8">
                 <ShoppingBag size={40} className="opacity-25" />
@@ -302,7 +296,8 @@ export function CartDrawer() {
                 {/* Список */}
                 <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
                   {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => {
-                    const price = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
+                    const price  = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
+                    const isGift = product.price === 0
                     return (
                       <div key={cartKey} className="flex gap-3 items-start">
                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
@@ -312,30 +307,36 @@ export function CartDrawer() {
                           }
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-text-primary line-clamp-2 leading-snug">{product.name}</p>
-
-                          {/* Топпинги */}
+                          <p className="text-sm font-medium text-text-primary line-clamp-2 leading-snug">
+                            {product.name}
+                            {isGift && <span className="ml-1 text-green-600">🎁</span>}
+                          </p>
                           {selectedToppings.length > 0 && (
                             <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
                               🧩 {selectedToppings.map(t => t.name).join(', ')}
                             </p>
                           )}
-
-                          <p className="text-xs text-text-muted mt-0.5">{formatPrice(price)}</p>
+                          <p className="text-xs text-text-muted mt-0.5">
+                            {isGift ? 'Подарок' : formatPrice(price)}
+                          </p>
                           <div className="flex items-center gap-2 mt-1.5">
                             <button onClick={() => updateQuantity(cartKey, quantity - 1)}
                               className="w-7 h-7 rounded-full border border-surface-border hover:border-brand hover:text-brand text-text-secondary flex items-center justify-center transition-colors">
                               {quantity === 1 ? <Trash2 size={12} /> : <Minus size={12} />}
                             </button>
                             <span className="text-text-primary font-semibold text-sm w-4 text-center">{quantity}</span>
-                            <button onClick={() => updateQuantity(cartKey, quantity + 1)}
-                              className="w-7 h-7 rounded-full bg-brand hover:bg-brand-light text-white flex items-center justify-center transition-colors">
+                            <button
+                              onClick={() => !isGift && updateQuantity(cartKey, quantity + 1)}
+                              disabled={isGift}
+                              className="w-7 h-7 rounded-full bg-brand hover:bg-brand-light text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                               <Plus size={12} />
                             </button>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <p className="text-sm font-semibold text-text-primary">{formatPrice(price * quantity)}</p>
+                          <p className="text-sm font-semibold text-text-primary">
+                            {isGift ? '0 ₽' : formatPrice(price * quantity)}
+                          </p>
                           <button onClick={() => removeItem(cartKey)} className="text-text-muted hover:text-brand transition-colors">
                             <X size={14} />
                           </button>
@@ -350,25 +351,25 @@ export function CartDrawer() {
 
                   {/* Адрес */}
                   {deliveryType === 'delivery' && (
-                   <button onClick={() => setShowAddrModal(true)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border hover:border-brand text-left transition-colors group">
-                   <MapPin size={15} className="text-text-muted group-hover:text-brand flex-shrink-0 transition-colors" />
-                   <span className={`text-sm flex-1 truncate ${address ? 'text-text-primary' : 'text-text-muted'}`}>
-                     {address || 'Укажите адрес доставки'}
-                   </span>
-                  <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
-                 </button>
-                )}
+                    <button onClick={() => setShowAddrModal(true)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border hover:border-brand text-left transition-colors group">
+                      <MapPin size={15} className="text-text-muted group-hover:text-brand flex-shrink-0 transition-colors" />
+                      <span className={`text-sm flex-1 truncate ${address ? 'text-text-primary' : 'text-text-muted'}`}>
+                        {address || 'Укажите адрес доставки'}
+                      </span>
+                      <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
+                    </button>
+                  )}
 
-                {deliveryType === 'pickup' && (
-                  <div className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border text-left">
-                    <MapPin size={15} className="text-text-muted flex-shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="text-xs text-text-muted">Адрес самовывоза</span>
-                      <span className="text-sm text-text-primary">Шоссейная ул., 4А, д. Фёдоровское</span>
+                  {deliveryType === 'pickup' && (
+                    <div className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border text-left">
+                      <MapPin size={15} className="text-text-muted flex-shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-text-muted">Адрес самовывоза</span>
+                        <span className="text-sm text-text-primary">Шоссейная ул., 4А, д. Фёдоровское</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                   {/* Бар — подарок */}
                   <ProgressBar
@@ -442,7 +443,6 @@ export function CartDrawer() {
         {page === 2 && (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
               <div className="space-y-3">
                 <h3 className="font-semibold text-text-primary text-sm">Контактные данные</h3>
                 <div>
@@ -490,7 +490,7 @@ export function CartDrawer() {
                     <div className="flex justify-between text-sm">
                       <span className="text-text-secondary line-clamp-1 flex-1">{product.name} × {quantity}</span>
                       <span className="text-text-primary font-medium ml-2 flex-shrink-0">
-                        {formatPrice(calcFinalPrice(product) * quantity)}
+                        {product.price === 0 ? '0 ₽' : formatPrice(calcFinalPrice(product) * quantity)}
                       </span>
                     </div>
                     {selectedToppings.length > 0 && (
@@ -507,7 +507,7 @@ export function CartDrawer() {
                   <p className="text-xs text-text-muted pt-1">📍 {address}</p>
                 )}
                 {deliveryType === 'pickup' && (
-                  <p className="text-xs text-text-muted pt-1">🏃 Самовывоз</p>
+                  <p className="text-xs text-text-muted pt-1">🏃 Самовывоз: Шоссейная ул., 4А, д. Фёдоровское</p>
                 )}
               </div>
             </div>
