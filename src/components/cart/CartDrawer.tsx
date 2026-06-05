@@ -350,15 +350,25 @@ export function CartDrawer() {
 
                   {/* Адрес */}
                   {deliveryType === 'delivery' && (
-                    <button onClick={() => setShowAddrModal(true)}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border hover:border-brand text-left transition-colors group">
-                      <MapPin size={15} className="text-text-muted group-hover:text-brand flex-shrink-0 transition-colors" />
-                      <span className={`text-sm flex-1 truncate ${address ? 'text-text-primary' : 'text-text-muted'}`}>
-                        {address || 'Укажите адрес доставки'}
-                      </span>
-                      <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
-                    </button>
-                  )}
+                   <button onClick={() => setShowAddrModal(true)}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border hover:border-brand text-left transition-colors group">
+                   <MapPin size={15} className="text-text-muted group-hover:text-brand flex-shrink-0 transition-colors" />
+                   <span className={`text-sm flex-1 truncate ${address ? 'text-text-primary' : 'text-text-muted'}`}>
+                     {address || 'Укажите адрес доставки'}
+                   </span>
+                  <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
+                 </button>
+                )}
+
+                {deliveryType === 'pickup' && (
+                  <div className="w-full flex items-center gap-2 px-4 py-2.5 rounded-btn border border-surface-border text-left">
+                    <MapPin size={15} className="text-text-muted flex-shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-text-muted">Адрес самовывоза</span>
+                      <span className="text-sm text-text-primary">Шоссейная ул., 4А, д. Фёдоровское</span>
+                    </div>
+                  </div>
+                )}
 
                   {/* Бар — подарок */}
                   <ProgressBar
