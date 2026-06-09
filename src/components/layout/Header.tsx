@@ -121,7 +121,7 @@ export function Header() {
           </a>
 
           {workingHours && (
-            <span className="text-sm text-text-muted">
+            <span className="text-sm text-text-secondary">
               Доставка с {workingHours.from} до {workingHours.to}
             </span>
           )}

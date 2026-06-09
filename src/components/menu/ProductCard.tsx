@@ -129,8 +129,8 @@ export function ProductCard({ product, onClick }: Props) {
 
             {quantity === 0 ? (
               <button
-                onClick={e => { e.stopPropagation(); addItem(product) }}
-                className="w-8 h-8 rounded-full bg-brand hover:bg-brand-light text-white flex items-center justify-center transition-colors flex-shrink-0 shadow-sm"
+                onClick={e => { e.stopPropagation(); if (product.category_id === '1735eddf-a938-46c0-b46e-6188eaef1b90') { onClick() } else { addItem(product) } }}
+                className="w-8 h-8 rounded-full bg-surface-input text-brand hover:bg-brand hover:text-white flex items-center justify-center transition-colors flex-shrink-0 shadow-sm"
               >
                 <Plus size={16} strokeWidth={2.5} />
               </button>
