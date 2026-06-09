@@ -1,5 +1,3 @@
-// Карусель баннеров с акциями: автопрокрутка, свайп, точки навигации.
-
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -21,12 +19,11 @@ interface Props {
 }
 
 export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props) {
-  const [current,    setCurrent]    = useState(0)
-  const [perView,    setPerView]    = useState(bannersDesktop)
+  const [current, setCurrent] = useState(0)
+  const [perView, setPerView] = useState(bannersDesktop)
   const dragStart = useRef(0)
   const timerRef  = useRef<ReturnType<typeof setInterval>>()
 
-  // Определяем perView по ширине экрана
   useEffect(() => {
     function update() {
       setPerView(window.innerWidth < 640 ? bannersMobile : bannersDesktop)
@@ -36,20 +33,18 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
     return () => window.removeEventListener('resize', update)
   }, [bannersDesktop, bannersMobile])
 
-  const total = Math.max(1, banners.length - perView + 1) // кол-во позиций прокрутки
+  const total = Math.max(1, banners.length - perView + 1)
 
   const next = useCallback(() => {
     setCurrent(c => (c + 1) % total)
   }, [total])
 
-  // Автопрокрутка каждые 4 сек
   useEffect(() => {
     if (banners.length <= perView) return
     timerRef.current = setInterval(next, 4000)
     return () => clearInterval(timerRef.current)
   }, [next, banners.length, perView])
 
-  // Сбрасываем таймер при ручном переключении
   function goTo(idx: number) {
     clearInterval(timerRef.current)
     setCurrent(idx)
@@ -78,7 +73,6 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
       onTouchStart={e => onDragStart(e.touches[0].clientX)}
       onTouchEnd={e => onDragEnd(e.changedTouches[0].clientX)}
     >
-      {/* Слайды */}
       <div
         className="flex h-full transition-transform duration-500 ease-in-out"
         style={{ transform: `translateX(-${current * (100 / perView)}%)` }}
@@ -88,7 +82,7 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
             key={banner.id}
             className="relative flex-shrink-0 h-full cursor-pointer px-1"
             style={{ width: `${100 / perView}%` }}
-            onClick={() => banner.link_url && window.open(banner.link_url, '_blank')}
+            onClick={() => window.location.href = `/promo/${banner.id}`}
           >
             <div className="relative w-full h-full rounded-card overflow-hidden">
               <Image
@@ -110,7 +104,6 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
         ))}
       </div>
 
-      {/* Стрелки */}
       {showNav && (
         <>
           <button onClick={() => goTo((current - 1 + total) % total)}
@@ -128,7 +121,6 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
         </>
       )}
 
-      {/* Точки */}
       {showNav && (
         <div className="absolute bottom-3 right-4 flex gap-1.5">
           {Array.from({ length: total }).map((_, i) => (

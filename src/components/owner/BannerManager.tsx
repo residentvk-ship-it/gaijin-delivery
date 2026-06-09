@@ -1,5 +1,3 @@
-// Управление баннерами: добавить, редактировать, скрыть, удалить, загрузить фото/гифку.
-
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -11,6 +9,7 @@ interface Banner {
   title: string | null
   image_url: string
   link_url: string | null
+  content: string | null
   sort_order: number
   is_active: boolean
 }
@@ -25,13 +24,13 @@ const h = {
 }
 
 export function BannerManager() {
-  const [banners,         setBanners]         = useState<Banner[]>([])
-  const [loading,         setLoading]         = useState(true)
-  const [showForm,        setShowForm]        = useState(false)
-  const [editing,         setEditing]         = useState<Banner | null>(null)
-  const [bannersDesktop,  setBannersDesktop]  = useState(1)
-  const [bannersMobile,   setBannersMobile]   = useState(1)
-  const [savingConfig,    setSavingConfig]    = useState(false)
+  const [banners,        setBanners]        = useState<Banner[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [showForm,       setShowForm]       = useState(false)
+  const [editing,        setEditing]        = useState<Banner | null>(null)
+  const [bannersDesktop, setBannersDesktop] = useState(1)
+  const [bannersMobile,  setBannersMobile]  = useState(1)
+  const [savingConfig,   setSavingConfig]   = useState(false)
 
   async function load() {
     setLoading(true)
@@ -84,51 +83,34 @@ export function BannerManager() {
       <div className="bg-white rounded-card shadow-card p-4 mb-6">
         <h3 className="font-semibold text-text-primary text-sm mb-4">Количество баннеров в ряд</h3>
         <div className="flex gap-6 flex-wrap">
-
-          {/* Десктоп */}
           <div className="flex items-center gap-3">
             <Monitor size={18} className="text-text-muted flex-shrink-0" />
             <span className="text-sm text-text-secondary">Десктоп</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4].map(n => (
                 <button key={n}
-                  onClick={() => {
-                    setBannersDesktop(n)
-                    saveConfig('banners_desktop', n)
-                  }}
+                  onClick={() => { setBannersDesktop(n); saveConfig('banners_desktop', n) }}
                   className={`w-9 h-9 rounded-btn text-sm font-semibold transition-colors
-                    ${bannersDesktop === n
-                      ? 'bg-brand text-white'
-                      : 'bg-surface-input text-text-secondary hover:text-brand'
-                    }`}>
+                    ${bannersDesktop === n ? 'bg-brand text-white' : 'bg-surface-input text-text-secondary hover:text-brand'}`}>
                   {n}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Мобайл */}
           <div className="flex items-center gap-3">
             <Smartphone size={18} className="text-text-muted flex-shrink-0" />
             <span className="text-sm text-text-secondary">Мобильный</span>
             <div className="flex gap-1">
               {[1, 2, 3].map(n => (
                 <button key={n}
-                  onClick={() => {
-                    setBannersMobile(n)
-                    saveConfig('banners_mobile', n)
-                  }}
+                  onClick={() => { setBannersMobile(n); saveConfig('banners_mobile', n) }}
                   className={`w-9 h-9 rounded-btn text-sm font-semibold transition-colors
-                    ${bannersMobile === n
-                      ? 'bg-brand text-white'
-                      : 'bg-surface-input text-text-secondary hover:text-brand'
-                    }`}>
+                    ${bannersMobile === n ? 'bg-brand text-white' : 'bg-surface-input text-text-secondary hover:text-brand'}`}>
                   {n}
                 </button>
               ))}
             </div>
           </div>
-
           {savingConfig && (
             <div className="flex items-center gap-1 text-text-muted text-xs">
               <Loader2 size={12} className="animate-spin" /> Сохраняю...
@@ -137,7 +119,7 @@ export function BannerManager() {
         </div>
       </div>
 
-      {/* Список баннеров */}
+      {/* Список */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-text-primary">Баннеры</h2>
@@ -169,9 +151,15 @@ export function BannerManager() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-text-primary text-sm">{b.title ?? 'Без названия'}</p>
-                {b.link_url && <p className="text-xs text-text-muted truncate mt-0.5">{b.link_url}</p>}
+                {b.content && (
+                  <p className="text-xs text-text-muted truncate mt-0.5">{b.content.slice(0, 60)}...</p>
+                )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => window.open(`/promo/${b.id}`, '_blank')}
+                  className="p-1.5 text-text-muted hover:text-brand transition-colors text-xs">
+                  👁 Страница
+                </button>
                 <button onClick={() => toggleActive(b)}
                   className="p-1.5 text-text-muted hover:text-brand transition-colors">
                   {b.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
@@ -195,8 +183,6 @@ export function BannerManager() {
   )
 }
 
-// ─── Форма ────────────────────────────────────────────────────────────────────
-
 function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [saving,    setSaving]    = useState(false)
@@ -205,7 +191,7 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
   const [imageUrl,  setImageUrl]  = useState(banner?.image_url ?? '')
   const [form, setForm] = useState({
     title:      banner?.title      ?? '',
-    link_url:   banner?.link_url   ?? '',
+    content:    banner?.content    ?? '',
     sort_order: banner?.sort_order ?? 0,
     is_active:  banner?.is_active  ?? true,
   })
@@ -220,7 +206,6 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
     const reader = new FileReader()
     reader.onload = ev => setPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
-
     setUploading(true)
     const data = new FormData()
     data.append('file', file)
@@ -241,8 +226,8 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
     setSaving(true)
 
     const payload = {
-      title:      form.title     || null,
-      link_url:   form.link_url  || null,
+      title:      form.title    || null,
+      content:    form.content  || null,
       image_url:  imageUrl,
       sort_order: Number(form.sort_order),
       is_active:  form.is_active,
@@ -257,24 +242,16 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
         })
 
     setSaving(false)
-
-    if (res.ok) {
-      toast.success(banner ? 'Баннер обновлён' : 'Баннер добавлен')
-      onClose()
-    } else {
-      const text = await res.text()
-      console.error('Banner save error:', text)
-      toast.error('Ошибка сохранения')
-    }
+    if (res.ok) { toast.success(banner ? 'Баннер обновлён' : 'Баннер добавлен'); onClose() }
+    else { toast.error('Ошибка сохранения') }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-         onClick={onClose}>
-      <div className="bg-white rounded-card w-full max-w-md shadow-modal"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-card w-full max-w-md shadow-modal max-h-[90dvh] overflow-y-auto"
            onClick={e => e.stopPropagation()}>
 
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border sticky top-0 bg-white">
           <h3 className="font-bold text-text-primary">
             {banner ? 'Редактировать баннер' : 'Добавить баннер'}
           </h3>
@@ -284,10 +261,9 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Изображение */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Изображение или GIF
-            </label>
+            <label className="block text-sm font-medium text-text-primary mb-2">Изображение или GIF</label>
             <div
               className="w-full h-32 rounded-card overflow-hidden bg-surface-input border-2 border-dashed
                          border-surface-border hover:border-brand cursor-pointer flex items-center justify-center transition-colors"
@@ -311,6 +287,7 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
             )}
           </div>
 
+          {/* Название */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Название <span className="text-text-muted text-xs">(необязательно)</span>
@@ -319,20 +296,24 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
               value={form.title} onChange={e => set('title', e.target.value)} />
           </div>
 
+          {/* Контент страницы */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Ссылка при клике <span className="text-text-muted text-xs">(необязательно)</span>
+              Текст акции <span className="text-text-muted text-xs">(показывается на странице акции)</span>
             </label>
-            <input className="input" placeholder="https://..."
-              value={form.link_url} onChange={e => set('link_url', e.target.value)} />
+            <textarea className="input resize-none" rows={6}
+              placeholder="Опишите условия акции, сроки, детали..."
+              value={form.content} onChange={e => set('content', e.target.value)} />
           </div>
 
+          {/* Порядок */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">Порядок</label>
             <input className="input" type="number" min="0"
               value={form.sort_order} onChange={e => set('sort_order', e.target.value)} />
           </div>
 
+          {/* Активность */}
           <label className="flex items-center gap-2 cursor-pointer">
             <div onClick={() => set('is_active', !form.is_active)}
               className={`w-10 h-6 rounded-full transition-colors relative
