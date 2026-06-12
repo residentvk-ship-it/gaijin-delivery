@@ -7,28 +7,16 @@ import type { Product, Badge } from '@/types'
 
 // ─── CSS-классы ───────────────────────────────────────────────────────────────
 
-/**
- * Объединяет CSS-классы Tailwind без конфликтов.
- * Пример: cn('px-2 py-1', condition && 'bg-red-500')
- */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 // ─── Цены и скидки ────────────────────────────────────────────────────────────
 
-/**
- * Форматирует число как цену в рублях.
- * Пример: formatPrice(350) → "350 ₽"
- */
 export function formatPrice(amount: number): string {
   return `${amount.toLocaleString('ru-RU')} ₽`
 }
 
-/**
- * Вычисляет финальную цену блюда с учётом скидки.
- * Приоритет: фиксированная скидка > процентная скидка.
- */
 export function calcFinalPrice(product: Product): number {
   if (product.discount_fixed) {
     return Math.max(0, product.price - product.discount_fixed)
@@ -39,10 +27,6 @@ export function calcFinalPrice(product: Product): number {
   return product.price
 }
 
-/**
- * Возвращает процент скидки для отображения бейджа.
- * Пример: getDiscountLabel(500, 400) → "-20%"
- */
 export function getDiscountLabel(original: number, final: number): string {
   const percent = Math.round(((original - final) / original) * 100)
   return `-${percent}%`
@@ -81,21 +65,13 @@ export const ORDER_STATUS_STEPS = [
   'completed',
 ] as const
 
-/**
- * Возвращает порядковый номер статуса (для прогресс-бара).
- * Отменённый заказ возвращает -1.
- */
 export function getStatusStep(status: string): number {
   const idx = ORDER_STATUS_STEPS.indexOf(status as any)
-  return idx // -1 если не найден (cancelled)
+  return idx
 }
 
 // ─── Дата и время ─────────────────────────────────────────────────────────────
 
-/**
- * Форматирует ISO-дату в читаемую строку на русском.
- * Пример: "27 мар 2025, 14:30"
- */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ru-RU', {
     day: 'numeric',
@@ -120,12 +96,28 @@ export function formatPhone(phone: string): string {
   return phone
 }
 
+/**
+ * Форматирует ввод телефона в маску +7 (999) 000-00-00
+ * Используется для input onChange
+ */
+export function maskPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+
+  const normalized = digits.startsWith('8') || digits.startsWith('7')
+    ? '7' + digits.slice(1)
+    : '7' + digits
+
+  const d = normalized.slice(0, 11)
+
+  if (d.length <= 1) return '+7'
+  if (d.length <= 4) return `+7 (${d.slice(1)}`
+  if (d.length <= 7) return `+7 (${d.slice(1, 4)}) ${d.slice(4)}`
+  if (d.length <= 9) return `+7 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`
+  return `+7 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7, 9)}-${d.slice(9, 11)}`
+}
+
 // ─── Slug ─────────────────────────────────────────────────────────────────────
 
-/**
- * Создаёт URL-slug из строки (для SEO).
- * Пример: "Горячие блюда" → "goryachie-blyuda"
- */
 export function slugify(str: string): string {
   const ru: Record<string, string> = {
     а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'zh',з:'z',и:'i',

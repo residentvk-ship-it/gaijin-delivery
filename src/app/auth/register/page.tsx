@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Mail, Lock, User, Phone, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { maskPhone } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
 export default function RegisterPage() {
@@ -17,7 +18,7 @@ export default function RegisterPage() {
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  const passwordMatch  = form.password.length > 0 && form.confirm.length > 0 && form.password === form.confirm
+  const passwordMatch   = form.password.length > 0 && form.confirm.length > 0 && form.password === form.confirm
   const passwordNoMatch = form.confirm.length > 0 && form.password !== form.confirm
 
   async function handleSubmit(e: React.FormEvent) {
@@ -78,7 +79,6 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Имя */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Ф.И.О <span className="text-brand">*</span>
@@ -90,7 +90,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Email <span className="text-brand">*</span>
@@ -103,7 +102,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Телефон */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Телефон <span className="text-brand">*</span>
@@ -111,12 +109,12 @@ export default function RegisterPage() {
             <div className="relative">
               <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input className="input pl-9" type="tel" placeholder="+7 (999) 000-00-00"
-                value={form.phone} onChange={e => set('phone', e.target.value)}
+                value={form.phone}
+                onChange={e => set('phone', maskPhone(e.target.value))}
                 autoComplete="tel" />
             </div>
           </div>
 
-          {/* Дата рождения */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Дата рождения
@@ -125,7 +123,6 @@ export default function RegisterPage() {
               value={form.birthday} onChange={e => set('birthday', e.target.value)} />
           </div>
 
-          {/* Пароль */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Пароль <span className="text-brand">*</span>
@@ -138,7 +135,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Подтверждение пароля */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Повторите пароль <span className="text-brand">*</span>
@@ -157,15 +153,10 @@ export default function RegisterPage() {
                 <CheckCircle2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" />
               )}
             </div>
-            {passwordNoMatch && (
-              <p className="text-xs text-brand mt-1">Пароли не совпадают</p>
-            )}
-            {passwordMatch && (
-              <p className="text-xs text-green-600 mt-1">Пароли совпадают</p>
-            )}
+            {passwordNoMatch && <p className="text-xs text-brand mt-1">Пароли не совпадают</p>}
+            {passwordMatch   && <p className="text-xs text-green-600 mt-1">Пароли совпадают</p>}
           </div>
 
-          {/* Политика */}
           <p className="text-xs text-text-muted text-center leading-relaxed">
             Регистрируясь, вы соглашаетесь с{' '}
             <a href="/privacy" className="text-brand hover:underline">
@@ -182,9 +173,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-text-secondary mt-6">
           Уже есть аккаунт?{' '}
-          <a href="/auth/login" className="text-brand hover:underline font-medium">
-            Войти
-          </a>
+          <a href="/auth/login" className="text-brand hover:underline font-medium">Войти</a>
         </p>
       </div>
     </div>

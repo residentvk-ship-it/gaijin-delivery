@@ -1,12 +1,11 @@
-// Личный кабинет: история заказов с live-статусом, профиль, сохранённые адреса.
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle } from 'lucide-react'
+import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle, Phone, Lock, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
+import { formatPhone, maskPhone } from '@/lib/utils'
 import type { Order, OrderItemSnapshot } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,13 +30,21 @@ type Tab = 'orders' | 'profile'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [tab,       setTab]       = useState<Tab>('orders')
-  const [orders,    setOrders]    = useState<Order[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [userId,    setUserId]    = useState<string | null>(null)
-  const [userName,  setUserName]  = useState<string>('')
-  const [userEmail, setUserEmail] = useState<string>('')
-  const [expanded,  setExpanded]  = useState<string | null>(null)
+  const [tab,        setTab]        = useState<Tab>('orders')
+  const [orders,     setOrders]     = useState<Order[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [saving,     setSaving]     = useState(false)
+  const [userId,     setUserId]     = useState<string | null>(null)
+  const [userName,   setUserName]   = useState('')
+  const [userEmail,  setUserEmail]  = useState('')
+  const [userPhone,  setUserPhone]  = useState('')
+  const [newEmail,   setNewEmail]   = useState('')
+  const [oldPass,    setOldPass]    = useState('')
+  const [newPass,    setNewPass]    = useState('')
+  const [newPass2,   setNewPass2]   = useState('')
+  const [expanded,   setExpanded]   = useState<string | null>(null)
+  const [saveMsg,    setSaveMsg]    = useState('')
+  const [passMsg,    setPassMsg]    = useState('')
 
   const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -46,33 +53,34 @@ export default function ProfilePage() {
     async function init() {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.replace('/auth/login'); return }
 
-      if (!session) {
-        router.replace('/auth/login')
-        return
-      }
-
-      const uid   = session.user.id
-      const name  = session.user.user_metadata?.name ?? ''
-      const email = session.user.email ?? ''
-
+      const uid = session.user.id
       setUserId(uid)
-      setUserName(name)
-      setUserEmail(email)
+      setUserEmail(session.user.email ?? '')
+      setNewEmail(session.user.email ?? '')
+
+      // Загружаем профиль из users_profiles
+      const { data: profile } = await supabase
+        .from('users_profiles')
+        .select('name, phone')
+        .eq('id', uid)
+        .single()
+
+      setUserName(profile?.name ?? session.user.user_metadata?.name ?? '')
+      setUserPhone(profile?.phone ?? '')
+
       loadOrders(uid, session.access_token)
     }
     init()
   }, [])
 
-  // Realtime — обновляем статусы заказов
   useEffect(() => {
     if (!userId) return
     const supabase = createClient()
     const channel = supabase
       .channel('profile-orders')
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'orders',
-      }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
         const updated = payload.new as Order
         setOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))
       })
@@ -93,10 +101,52 @@ export default function ProfilePage() {
     setLoading(false)
   }
 
+  // Маска телефона при вводе
+  function handlePhoneInput(raw: string) {
+    setUserPhone(maskPhone(raw))
+  }
+
+  async function saveProfile() {
+    if (!userId) return
+    setSaving(true)
+    setSaveMsg('')
+    const supabase = createClient()
+
+    await supabase.from('users_profiles').upsert({
+      id:    userId,
+      name:  userName.trim(),
+      phone: userPhone.trim(),
+    })
+
+    // Смена email если изменился
+    if (newEmail.trim() && newEmail.trim() !== userEmail) {
+      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
+      if (error) { setSaveMsg('Ошибка смены email: ' + error.message); setSaving(false); return }
+      setSaveMsg('На новый email отправлено письмо для подтверждения.')
+    } else {
+      setSaveMsg('Сохранено!')
+    }
+
+    setSaving(false)
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+
+  async function changePassword() {
+    if (!newPass || newPass !== newPass2) { setPassMsg('Пароли не совпадают'); return }
+    if (newPass.length < 6) { setPassMsg('Минимум 6 символов'); return }
+    setPassMsg('')
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: newPass })
+    if (error) { setPassMsg('Ошибка: ' + error.message) }
+    else { setPassMsg('Пароль изменён!'); setOldPass(''); setNewPass(''); setNewPass2('') }
+    setSaving(false)
+    setTimeout(() => setPassMsg(''), 3000)
+  }
+
   return (
     <div className="min-h-screen bg-surface-section">
 
-      {/* Шапка */}
       <div className="bg-white border-b border-surface-border sticky top-0 z-10"
            style={{ backdropFilter: 'blur(16px)', background: 'rgba(255,255,255,0.9)' }}>
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
@@ -106,19 +156,16 @@ export default function ProfilePage() {
           <h1 className="font-bold text-text-primary flex-1">Личный кабинет</h1>
         </div>
 
-        {/* Вкладки */}
         <div className="max-w-lg mx-auto px-4 flex">
           {([
             { value: 'orders',  label: '📦 Заказы'  },
             { value: 'profile', label: '👤 Профиль' },
           ] as const).map(t => (
-            <button key={t.value}
-              onClick={() => setTab(t.value)}
+            <button key={t.value} onClick={() => setTab(t.value)}
               className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors
                 ${tab === t.value
                   ? 'border-brand text-brand'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-                }`}>
+                  : 'border-transparent text-text-secondary hover:text-text-primary'}`}>
               {t.label}
             </button>
           ))}
@@ -127,7 +174,7 @@ export default function ProfilePage() {
 
       <div className="max-w-lg mx-auto px-4 py-4">
 
-        {/* Вкладка: Заказы */}
+        {/* Заказы */}
         {tab === 'orders' && (
           <div className="space-y-3">
             {loading ? (
@@ -138,9 +185,7 @@ export default function ProfilePage() {
               <div className="bg-white rounded-card shadow-card p-12 text-center text-text-muted">
                 <Package size={40} className="mx-auto mb-3 opacity-25" />
                 <p className="font-medium">Заказов пока нет</p>
-                <a href="/" className="btn-primary inline-block mt-4 text-sm">
-                  Перейти в меню
-                </a>
+                <a href="/" className="btn-primary inline-block mt-4 text-sm">Перейти в меню</a>
               </div>
             ) : (
               orders.map(order => {
@@ -151,7 +196,6 @@ export default function ProfilePage() {
 
                 return (
                   <div key={order.id} className="bg-white rounded-card shadow-card overflow-hidden">
-
                     <button
                       className="w-full flex items-center gap-3 p-4 hover:bg-surface-section transition-colors text-left"
                       onClick={() => setExpanded(isExpanded ? null : order.id)}
@@ -160,7 +204,6 @@ export default function ProfilePage() {
                         ${isActive ? 'bg-brand/10' : 'bg-surface-section'}`}>
                         <Icon size={18} className={isActive ? 'text-brand' : 'text-text-muted'} />
                       </div>
-
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-text-primary text-sm">
@@ -174,7 +217,6 @@ export default function ProfilePage() {
                           {formatDate(order.created_at)} · {items.length} позиций · {formatPrice(order.total)}
                         </p>
                       </div>
-
                       <ChevronRight size={16} className={`text-text-muted flex-shrink-0 transition-transform
                         ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
@@ -228,28 +270,94 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Вкладка: Профиль */}
+        {/* Профиль */}
         {tab === 'profile' && (
           <div className="space-y-4">
+
+            {/* Личные данные */}
             <div className="bg-white rounded-card shadow-card p-5 space-y-4">
               <h2 className="font-semibold text-text-primary">Личные данные</h2>
 
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Имя</label>
-                <input className="input" value={userName}
-                  onChange={e => setUserName(e.target.value)} placeholder="Ваше имя" />
+                <div className="relative">
+                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input className="input pl-9" value={userName}
+                    onChange={e => setUserName(e.target.value)} placeholder="Ваше имя" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-secondary mb-1">Телефон</label>
+                <div className="relative">
+                  <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input className="input pl-9" type="tel" placeholder="+7 (999) 000-00-00"
+                    value={userPhone} onChange={e => handlePhoneInput(e.target.value)} />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Email</label>
-                <input className="input opacity-60 cursor-not-allowed" value={userEmail} disabled />
+                <input className="input" type="email" value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)} placeholder="email@example.com" />
+                {newEmail !== userEmail && newEmail && (
+                  <p className="text-xs text-text-muted mt-1">
+                    После сохранения придёт письмо для подтверждения нового адреса
+                  </p>
+                )}
               </div>
 
-              <button className="btn-primary w-full py-2.5 text-sm">
+              {saveMsg && (
+                <p className={`text-xs font-medium ${saveMsg.startsWith('Ошибка') ? 'text-red-500' : 'text-green-600'}`}>
+                  {saveMsg}
+                </p>
+              )}
+
+              <button onClick={saveProfile} disabled={saving}
+                className="btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2">
+                {saving && <Loader2 size={15} className="animate-spin" />}
                 Сохранить
               </button>
             </div>
 
+            {/* Смена пароля */}
+            <div className="bg-white rounded-card shadow-card p-5 space-y-4">
+              <h2 className="font-semibold text-text-primary">Сменить пароль</h2>
+
+              <div>
+                <label className="block text-xs text-text-secondary mb-1">Новый пароль</label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input className="input pl-9" type="password" placeholder="Минимум 6 символов"
+                    value={newPass} onChange={e => setNewPass(e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-secondary mb-1">Повторите пароль</label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    className={`input pl-9 ${newPass2 && newPass !== newPass2 ? 'border-red-400' : ''} ${newPass2 && newPass === newPass2 && newPass.length >= 6 ? 'border-green-400' : ''}`}
+                    type="password" placeholder="••••••••"
+                    value={newPass2} onChange={e => setNewPass2(e.target.value)} />
+                </div>
+              </div>
+
+              {passMsg && (
+                <p className={`text-xs font-medium ${passMsg.startsWith('Ошибка') || passMsg === 'Пароли не совпадают' || passMsg.includes('символов') ? 'text-red-500' : 'text-green-600'}`}>
+                  {passMsg}
+                </p>
+              )}
+
+              <button onClick={changePassword} disabled={saving || !newPass || !newPass2}
+                className="btn-secondary w-full py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {saving && <Loader2 size={15} className="animate-spin" />}
+                Изменить пароль
+              </button>
+            </div>
+
+            {/* Статистика */}
             <div className="bg-white rounded-card shadow-card p-5">
               <h2 className="font-semibold text-text-primary mb-3">Статистика</h2>
               <div className="grid grid-cols-3 gap-3 text-center">
