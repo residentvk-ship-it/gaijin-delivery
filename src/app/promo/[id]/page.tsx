@@ -1,6 +1,4 @@
 // Страница акции — показывает баннер и текстовый контент
-// Файл: src/app/promo/[id]/page.tsx
-
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
@@ -38,8 +36,7 @@ export default async function PromoPage({ params }: { params: { id: string } }) 
       <Header />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
-        {/* Изображение */}
-        <div className="relative w-full rounded-2xl overflow-hidden mb-6"
+        <div className="relative w-full rounded-2xl overflow-hidden mb-6">
           <Image
             src={banner.image_url}
             alt={banner.title ?? 'Акция'}
@@ -50,12 +47,10 @@ export default async function PromoPage({ params }: { params: { id: string } }) 
           />
         </div>
 
-        {/* Заголовок */}
         {banner.title && (
           <h1 className="text-2xl font-bold text-text-primary mb-4">{banner.title}</h1>
         )}
 
-        {/* Контент */}
         {banner.content ? (
           <div
             className="prose prose-sm max-w-none text-text-primary leading-relaxed"
@@ -65,9 +60,7 @@ export default async function PromoPage({ params }: { params: { id: string } }) 
           <p className="text-text-muted">Подробности акции скоро появятся.</p>
         )}
 
-        {/* Кнопка назад */}
-        <a href="/"
-          className="inline-flex items-center gap-2 mt-8 text-sm text-brand hover:underline">
+        <a href="/" className="inline-flex items-center gap-2 mt-8 text-sm text-brand hover:underline">
           ← Вернуться в меню
         </a>
       </main>
