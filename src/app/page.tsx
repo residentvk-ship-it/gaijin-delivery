@@ -1,5 +1,3 @@
-// Главная страница: каталог слева, корзина прилипшая справа на десктопе.
-
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -7,14 +5,18 @@ import { Header } from '@/components/layout/Header'
 import { CategoryBar } from '@/components/menu/CategoryBar'
 import { ProductCard } from '@/components/menu/ProductCard'
 import { ProductModal } from '@/components/menu/ProductModal'
+import { BannerModal } from '@/components/menu/BannerModal'
 import { useMenu } from '@/hooks/useMenu'
 import { BannerCarousel } from '@/components/menu/BannerCarousel'
 import type { Product } from '@/types'
+
+interface Banner { id: string; title: string | null; image_url: string }
 
 export default function HomePage() {
   const { categories, products, featured, banners, bannersDesktop, bannersMobile, isLoading, error } = useMenu()
   const [activeSlug, setActiveSlug]           = useState<string>('')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [selectedBanner, setSelectedBanner]   = useState<Banner | null>(null)
   const [isScrolling, setIsScrolling]         = useState(false)
   const sectionRefs = useRef<Record<string, HTMLElement>>({})
   const scrollTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -77,10 +79,7 @@ export default function HomePage() {
         />
       )}
 
-      {/* Основной layout: меню + корзина */}
       <div className="max-w-6xl mx-auto px-4 py-4 flex gap-6 items-start">
-
-        {/* Каталог — основная колонка */}
         <main className="flex-1 min-w-0 pb-24">
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -96,10 +95,14 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-            {/* Баннеры с акциями */}
-             {banners.length > 0 && (
+              {banners.length > 0 && (
                 <div className="mt-4 mb-2">
-                  <BannerCarousel banners={banners} bannersDesktop={bannersDesktop} bannersMobile={bannersMobile} />
+                  <BannerCarousel
+                    banners={banners}
+                    bannersDesktop={bannersDesktop}
+                    bannersMobile={bannersMobile}
+                    onBannerClick={setSelectedBanner}
+                  />
                 </div>
               )}
 
@@ -145,12 +148,16 @@ export default function HomePage() {
             </>
           )}
         </main>
-
       </div>
 
       <ProductModal
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
+      />
+
+      <BannerModal
+        banner={selectedBanner}
+        onClose={() => setSelectedBanner(null)}
       />
     </>
   )

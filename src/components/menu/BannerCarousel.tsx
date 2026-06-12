@@ -16,9 +16,10 @@ interface Props {
   banners:        Banner[]
   bannersDesktop: number
   bannersMobile:  number
+  onBannerClick:  (banner: Banner) => void
 }
 
-export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props) {
+export function BannerCarousel({ banners, bannersDesktop, bannersMobile, onBannerClick }: Props) {
   const [current, setCurrent] = useState(0)
   const [perView, setPerView] = useState(bannersDesktop)
   const dragStart = useRef(0)
@@ -82,7 +83,7 @@ export function BannerCarousel({ banners, bannersDesktop, bannersMobile }: Props
             key={banner.id}
             className="relative flex-shrink-0 h-full cursor-pointer px-1"
             style={{ width: `${100 / perView}%` }}
-            onClick={() => window.location.href = `/promo/${banner.id}`}
+            onClick={() => onBannerClick(banner)}
           >
             <div className="relative w-full h-full rounded-card overflow-hidden">
               <Image
