@@ -81,11 +81,11 @@ export default function RegisterPage() {
           {/* Имя */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Имя <span className="text-brand">*</span>
+              Ф.И.О <span className="text-brand">*</span>
             </label>
             <div className="relative">
               <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input className="input pl-9" placeholder="Иван"
+              <input className="input pl-9" placeholder="Ф.И.О"
                 value={form.name} onChange={e => set('name', e.target.value)} />
             </div>
           </div>
