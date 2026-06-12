@@ -40,12 +40,12 @@ export default async function PromoPage({ params }: { params: { id: string } }) 
       <main className="max-w-3xl mx-auto px-4 py-8">
         {/* Изображение */}
         <div className="relative w-full rounded-2xl overflow-hidden mb-6"
-             style={{ aspectRatio: '2/1' }}>
           <Image
             src={banner.image_url}
             alt={banner.title ?? 'Акция'}
-            fill
-            className="object-cover"
+            width={900}
+            height={450}
+            className="w-full h-auto object-contain"
             priority
           />
         </div>
