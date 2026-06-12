@@ -88,7 +88,7 @@ export function ProductCard({ product, onClick }: Props) {
         )}
 
         {product.badges.length > 0 && (
-          <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-20">
+          <div className="absolute top-2 left-2 hidden sm:flex flex-wrap gap-1 z-20">
             {product.badges.slice(0, 2).map(badge => {
               const cfg = getBadgeConfig(badge)
               return (

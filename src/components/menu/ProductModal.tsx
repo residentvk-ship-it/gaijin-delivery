@@ -107,11 +107,11 @@ export function ProductModal({ product, onClose }: Props) {
 
           {/* Бейджи */}
           {product.badges.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {product.badges.map(badge => {
                 const cfg = getBadgeConfig(badge)
                 return (
-                  <span key={badge} className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', cfg.className)}>
+                  <span key={badge} className={cfg.className} style={cfg.style}>
                     {cfg.label}
                   </span>
                 )
