@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { XCircle, Clock } from 'lucide-react'
+import { XCircle, Clock, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order, OrderStatus, OrderItemSnapshot } from '@/types'
@@ -48,6 +48,17 @@ export default function AdminPage() {
   const [filterStatus, setFilterStatus] = useState<string>('active')
   // orderId → выбранное время для заказа который принимаем
   const [deliveryTimes, setDeliveryTimes] = useState<Record<string, number>>({})
+  const [reviews, setReviews] = useState<Record<string, any>>({})
+
+  async function loadReview(orderId: string) {
+    if (orderId in reviews) return
+    const { data } = await supabase
+      .from('order_reviews')
+      .select('*')
+      .eq('order_id', orderId)
+      .single()
+    setReviews(prev => ({ ...prev, [orderId]: data ?? null }))
+  }
 
   const supabase = createClient()
 
@@ -175,7 +186,7 @@ export default function AdminPage() {
                   <div key={order.id}
                     className={`bg-white rounded-card shadow-card p-4 transition-all cursor-pointer
                       ${isActive ? 'ring-2 ring-brand' : 'hover:shadow-card-hover'}`}
-                    onClick={() => setSelected(isActive ? null : order)}
+                    onClick={() => { setSelected(isActive ? null : order); if (!isActive) loadReview(order.id) }}}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -310,6 +321,33 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
+
+              {/* Отзыв клиента */}
+              {selected.id in reviews && (
+                <div className="mt-4 pt-4 border-t border-surface-border">
+                  <p className="text-xs text-text-muted font-medium mb-2">Отзыв клиента</p>
+                  {reviews[selected.id] === null ? (
+                    <p className="text-xs text-text-muted italic">Отзыв не оставлен</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} size={14}
+                            className={i < reviews[selected.id].rating ? 'text-yellow-400 fill-yellow-400' : 'text-surface-border'} />
+                        ))}
+                        <span className="text-xs text-text-muted ml-1">{reviews[selected.id].rating}/5</span>
+                      </div>
+                      {reviews[selected.id].text && (
+                        <p className="text-sm text-text-secondary">{reviews[selected.id].text}</p>
+                      )}
+                      {reviews[selected.id].photo_url && (
+                        <img src={reviews[selected.id].photo_url} alt="фото"
+                          className="w-full rounded-lg object-cover mt-1" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
