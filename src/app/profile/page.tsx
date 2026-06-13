@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle, Phone, Lock, Loader2 } from 'lucide-react'
+import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle, Phone, Lock, Loader2, Star, Camera } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
-import { formatPhone, maskPhone } from '@/lib/utils'
-import type { Order, OrderItemSnapshot } from '@/types'
+import { formatPrice, formatDate, ORDER_STATUS_LABELS, maskPhone } from '@/lib/utils'
+import type { Order, OrderItemSnapshot, OrderReview } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
   new:        'bg-blue-100 text-blue-700',
@@ -39,12 +38,17 @@ export default function ProfilePage() {
   const [userEmail,  setUserEmail]  = useState('')
   const [userPhone,  setUserPhone]  = useState('')
   const [newEmail,   setNewEmail]   = useState('')
-  const [oldPass,    setOldPass]    = useState('')
   const [newPass,    setNewPass]    = useState('')
   const [newPass2,   setNewPass2]   = useState('')
   const [expanded,   setExpanded]   = useState<string | null>(null)
   const [saveMsg,    setSaveMsg]    = useState('')
   const [passMsg,    setPassMsg]    = useState('')
+  const [reviews,    setReviews]    = useState<Record<string, OrderReview>>({})
+  const [reviewing,  setReviewing]  = useState<string | null>(null)
+  const [revRating,  setRevRating]  = useState(5)
+  const [revText,    setRevText]    = useState('')
+  const [revPhoto,   setRevPhoto]   = useState<File | null>(null)
+  const [revSaving,  setRevSaving]  = useState(false)
 
   const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -60,7 +64,6 @@ export default function ProfilePage() {
       setUserEmail(session.user.email ?? '')
       setNewEmail(session.user.email ?? '')
 
-      // Загружаем профиль из users_profiles
       const { data: profile } = await supabase
         .from('users_profiles')
         .select('name, phone')
@@ -71,6 +74,7 @@ export default function ProfilePage() {
       setUserPhone(profile?.phone ?? '')
 
       loadOrders(uid, session.access_token)
+      loadReviews(uid, session.access_token)
     }
     init()
   }, [])
@@ -101,9 +105,54 @@ export default function ProfilePage() {
     setLoading(false)
   }
 
-  // Маска телефона при вводе
-  function handlePhoneInput(raw: string) {
-    setUserPhone(maskPhone(raw))
+  async function loadReviews(uid: string, token: string) {
+    try {
+      const res = await fetch(
+        `${URL}/rest/v1/order_reviews?user_id=eq.${uid}&select=*`,
+        { headers: { apikey: ANON, Authorization: `Bearer ${token}` } }
+      )
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        const map: Record<string, OrderReview> = {}
+        data.forEach((r: OrderReview) => { map[r.order_id] = r })
+        setReviews(map)
+      }
+    } catch {}
+  }
+
+  async function submitReview(orderId: string) {
+    if (!userId) return
+    setRevSaving(true)
+    const supabase = createClient()
+
+    let photo_url: string | null = null
+
+    if (revPhoto) {
+      const ext  = revPhoto.name.split('.').pop()
+      const path = `reviews/${userId}/${orderId}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('reviews')
+        .upload(path, revPhoto, { upsert: true })
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('reviews').getPublicUrl(path)
+        photo_url = urlData.publicUrl
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('order_reviews')
+      .upsert({ order_id: orderId, user_id: userId, rating: revRating, text: revText, photo_url })
+      .select()
+      .single()
+
+    if (!error && data) {
+      setReviews(prev => ({ ...prev, [orderId]: data as OrderReview }))
+      setReviewing(null)
+      setRevText('')
+      setRevPhoto(null)
+      setRevRating(5)
+    }
+    setRevSaving(false)
   }
 
   async function saveProfile() {
@@ -118,7 +167,6 @@ export default function ProfilePage() {
       phone: userPhone.trim(),
     })
 
-    // Смена email если изменился
     if (newEmail.trim() && newEmail.trim() !== userEmail) {
       const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
       if (error) { setSaveMsg('Ошибка смены email: ' + error.message); setSaving(false); return }
@@ -139,7 +187,7 @@ export default function ProfilePage() {
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: newPass })
     if (error) { setPassMsg('Ошибка: ' + error.message) }
-    else { setPassMsg('Пароль изменён!'); setOldPass(''); setNewPass(''); setNewPass2('') }
+    else { setPassMsg('Пароль изменён!'); setNewPass(''); setNewPass2('') }
     setSaving(false)
     setTimeout(() => setPassMsg(''), 3000)
   }
@@ -155,7 +203,6 @@ export default function ProfilePage() {
           </a>
           <h1 className="font-bold text-text-primary flex-1">Личный кабинет</h1>
         </div>
-
         <div className="max-w-lg mx-auto px-4 flex">
           {([
             { value: 'orders',  label: '📦 Заказы'  },
@@ -193,6 +240,7 @@ export default function ProfilePage() {
                 const isExpanded = expanded === order.id
                 const Icon       = STATUS_ICONS[order.status] ?? Clock
                 const isActive   = !['completed', 'cancelled'].includes(order.status)
+                const review     = reviews[order.id]
 
                 return (
                   <div key={order.id} className="bg-white rounded-card shadow-card overflow-hidden">
@@ -216,6 +264,12 @@ export default function ProfilePage() {
                         <p className="text-xs text-text-muted mt-0.5">
                           {formatDate(order.created_at)} · {items.length} позиций · {formatPrice(order.total)}
                         </p>
+                        {/* Время доставки */}
+                        {order.delivery_note && isActive && (
+                          <p className="text-xs text-green-600 font-medium mt-0.5">
+                            ⏱ {order.delivery_note}
+                          </p>
+                        )}
                       </div>
                       <ChevronRight size={16} className={`text-text-muted flex-shrink-0 transition-transform
                         ${isExpanded ? 'rotate-90' : ''}`} />
@@ -235,6 +289,7 @@ export default function ProfilePage() {
                         </div>
                         <p className="text-xs text-brand mt-1 font-medium">
                           {ORDER_STATUS_LABELS[order.status]}
+                          {order.delivery_note ? ` · ${order.delivery_note}` : ''}
                         </p>
                       </div>
                     )}
@@ -258,7 +313,72 @@ export default function ProfilePage() {
                           <p>💳 {order.payment_method === 'cash' ? 'Наличными' : 'Картой онлайн'}</p>
                           {order.comment && <p>💬 {order.comment}</p>}
                         </div>
-                        <a href="/" className="btn-secondary w-full text-center text-sm py-2 block mt-2">
+
+                        {/* Отзыв — только для выполненных */}
+                        {order.status === 'completed' && (
+                          <div className="pt-2 border-t border-surface-border">
+                            {review ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star key={i} size={14}
+                                      className={i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-surface-border'} />
+                                  ))}
+                                  <span className="text-xs text-text-muted ml-1">Ваш отзыв</span>
+                                </div>
+                                {review.text && <p className="text-xs text-text-secondary">{review.text}</p>}
+                                {review.photo_url && (
+                                  <img src={review.photo_url} alt="фото отзыва"
+                                    className="w-20 h-20 object-cover rounded-lg mt-1" />
+                                )}
+                              </div>
+                            ) : reviewing === order.id ? (
+                              <div className="space-y-3">
+                                {/* Звёзды */}
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <button key={i} onClick={() => setRevRating(i + 1)}>
+                                      <Star size={24}
+                                        className={i < revRating ? 'text-yellow-400 fill-yellow-400' : 'text-surface-border'} />
+                                    </button>
+                                  ))}
+                                </div>
+                                <textarea
+                                  className="input text-sm resize-none h-20"
+                                  placeholder="Напишите отзыв..."
+                                  value={revText}
+                                  onChange={e => setRevText(e.target.value)}
+                                />
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary hover:text-brand transition-colors">
+                                  <Camera size={16} />
+                                  {revPhoto ? revPhoto.name : 'Прикрепить фото'}
+                                  <input type="file" accept="image/*" className="hidden"
+                                    onChange={e => setRevPhoto(e.target.files?.[0] ?? null)} />
+                                </label>
+                                <div className="flex gap-2">
+                                  <button onClick={() => submitReview(order.id)}
+                                    disabled={revSaving}
+                                    className="btn-primary flex-1 py-2 text-sm flex items-center justify-center gap-1.5">
+                                    {revSaving && <Loader2 size={14} className="animate-spin" />}
+                                    Отправить
+                                  </button>
+                                  <button onClick={() => setReviewing(null)}
+                                    className="btn-secondary px-4 py-2 text-sm">
+                                    Отмена
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setReviewing(order.id)}
+                                className="w-full py-2 text-sm text-brand border border-brand/30 rounded-btn hover:bg-brand/5 transition-colors flex items-center justify-center gap-1.5">
+                                <Star size={14} /> Оставить отзыв
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        <a href="/" className="btn-secondary w-full text-center text-sm py-2 block mt-1">
                           🔄 Повторить заказ
                         </a>
                       </div>
@@ -273,11 +393,8 @@ export default function ProfilePage() {
         {/* Профиль */}
         {tab === 'profile' && (
           <div className="space-y-4">
-
-            {/* Личные данные */}
             <div className="bg-white rounded-card shadow-card p-5 space-y-4">
               <h2 className="font-semibold text-text-primary">Личные данные</h2>
-
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Имя</label>
                 <div className="relative">
@@ -286,16 +403,14 @@ export default function ProfilePage() {
                     onChange={e => setUserName(e.target.value)} placeholder="Ваше имя" />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Телефон</label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                   <input className="input pl-9" type="tel" placeholder="+7 (999) 000-00-00"
-                    value={userPhone} onChange={e => handlePhoneInput(e.target.value)} />
+                    value={userPhone} onChange={e => setUserPhone(maskPhone(e.target.value))} />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Email</label>
                 <input className="input" type="email" value={newEmail}
@@ -306,13 +421,11 @@ export default function ProfilePage() {
                   </p>
                 )}
               </div>
-
               {saveMsg && (
                 <p className={`text-xs font-medium ${saveMsg.startsWith('Ошибка') ? 'text-red-500' : 'text-green-600'}`}>
                   {saveMsg}
                 </p>
               )}
-
               <button onClick={saveProfile} disabled={saving}
                 className="btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2">
                 {saving && <Loader2 size={15} className="animate-spin" />}
@@ -320,10 +433,8 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Смена пароля */}
             <div className="bg-white rounded-card shadow-card p-5 space-y-4">
               <h2 className="font-semibold text-text-primary">Сменить пароль</h2>
-
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Новый пароль</label>
                 <div className="relative">
@@ -332,7 +443,6 @@ export default function ProfilePage() {
                     value={newPass} onChange={e => setNewPass(e.target.value)} />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-text-secondary mb-1">Повторите пароль</label>
                 <div className="relative">
@@ -343,13 +453,11 @@ export default function ProfilePage() {
                     value={newPass2} onChange={e => setNewPass2(e.target.value)} />
                 </div>
               </div>
-
               {passMsg && (
-                <p className={`text-xs font-medium ${passMsg.startsWith('Ошибка') || passMsg === 'Пароли не совпадают' || passMsg.includes('символов') ? 'text-red-500' : 'text-green-600'}`}>
+                <p className={`text-xs font-medium ${passMsg.startsWith('Ошибка') || passMsg.includes('совпадают') || passMsg.includes('символов') ? 'text-red-500' : 'text-green-600'}`}>
                   {passMsg}
                 </p>
               )}
-
               <button onClick={changePassword} disabled={saving || !newPass || !newPass2}
                 className="btn-secondary w-full py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 {saving && <Loader2 size={15} className="animate-spin" />}
@@ -357,7 +465,6 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Статистика */}
             <div className="bg-white rounded-card shadow-card p-5">
               <h2 className="font-semibold text-text-primary mb-3">Статистика</h2>
               <div className="grid grid-cols-3 gap-3 text-center">

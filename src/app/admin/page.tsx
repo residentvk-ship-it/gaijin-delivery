@@ -1,9 +1,7 @@
-// Панель администратора: live-список заказов, смена статусов, детали заказа.
-
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, XCircle, ChefHat, Bike, Clock, Eye } from 'lucide-react'
+import { XCircle, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order, OrderStatus, OrderItemSnapshot } from '@/types'
@@ -34,11 +32,22 @@ const STATUS_NEXT_LABEL: Record<string, string> = {
   delivering: '🎉 Выполнен',
 }
 
+const DELIVERY_OPTIONS = [
+  { minutes: 30,  label: '~30 мин' },
+  { minutes: 45,  label: '~45 мин' },
+  { minutes: 60,  label: '~1 час' },
+  { minutes: 90,  label: '~1.5 часа' },
+  { minutes: 120, label: '~2 часа' },
+  { minutes: 180, label: '3+ часа' },
+]
+
 export default function AdminPage() {
-  const [orders,      setOrders]      = useState<Order[]>([])
-  const [loading,     setLoading]     = useState(true)
-  const [selected,    setSelected]    = useState<Order | null>(null)
+  const [orders,       setOrders]       = useState<Order[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [selected,     setSelected]     = useState<Order | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('active')
+  // orderId → выбранное время для заказа который принимаем
+  const [deliveryTimes, setDeliveryTimes] = useState<Record<string, number>>({})
 
   const supabase = createClient()
 
@@ -54,18 +63,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     load()
-
-    // Realtime — слушаем новые заказы и обновления
     const channel = supabase
       .channel('admin-orders')
-      .on('postgres_changes', {
-        event:  '*',
-        schema: 'public',
-        table:  'orders',
-      }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          const newOrder = payload.new as Order
-          setOrders(prev => [newOrder, ...prev])
+          setOrders(prev => [payload.new as Order, ...prev])
           toast('🆕 Новый заказ!', { duration: 6000, icon: '🔔' })
         }
         if (payload.eventType === 'UPDATE') {
@@ -75,15 +77,25 @@ export default function AdminPage() {
         }
       })
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
   }, [])
 
   async function updateStatus(order: Order, status: OrderStatus) {
+    const extra: Partial<Order> = {}
+
+    // При принятии заказа сохраняем время доставки
+    if (status === 'accepted') {
+      const mins = deliveryTimes[order.id] ?? 45
+      const opt  = DELIVERY_OPTIONS.find(o => o.minutes === mins) ?? DELIVERY_OPTIONS[1]
+      extra.delivery_minutes = mins
+      extra.delivery_note    = `Ожидайте ${opt.label}`
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({ status })
+      .update({ status, ...extra })
       .eq('id', order.id)
+
     if (error) toast.error('Ошибка: ' + error.message)
     else toast.success(`Статус → ${ORDER_STATUS_LABELS[status]}`)
   }
@@ -93,7 +105,6 @@ export default function AdminPage() {
     await updateStatus(order, 'cancelled')
   }
 
-  // Фильтрация
   const filtered = orders.filter(o => {
     if (filterStatus === 'active')    return !['completed', 'cancelled'].includes(o.status)
     if (filterStatus === 'completed') return o.status === 'completed'
@@ -106,7 +117,6 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-surface-section">
 
-      {/* Шапка */}
       <div className="bg-white border-b border-surface-border sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -119,19 +129,14 @@ export default function AdminPage() {
               </span>
             )}
           </div>
-          <a href="/" className="text-sm text-text-secondary hover:text-brand transition-colors">
-            ← На сайт
-          </a>
+          <a href="/" className="text-sm text-text-secondary hover:text-brand transition-colors">← На сайт</a>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6 flex gap-6">
 
-        {/* Список заказов */}
         <div className="flex-1 min-w-0">
-
-          {/* Фильтры */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4 flex-wrap">
             {[
               { value: 'active',    label: `Активные (${activeCount})` },
               { value: 'completed', label: 'Выполненные' },
@@ -142,8 +147,7 @@ export default function AdminPage() {
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors
                   ${filterStatus === f.value
                     ? 'bg-brand text-white'
-                    : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'
-                  }`}>
+                    : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'}`}>
                 {f.label}
               </button>
             ))}
@@ -163,9 +167,9 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-3">
               {filtered.map(order => {
-                const items   = order.items as OrderItemSnapshot[]
+                const items      = order.items as OrderItemSnapshot[]
                 const nextStatus = STATUS_FLOW[order.status as OrderStatus]
-                const isActive = selected?.id === order.id
+                const isActive   = selected?.id === order.id
 
                 return (
                   <div key={order.id}
@@ -174,7 +178,6 @@ export default function AdminPage() {
                     onClick={() => setSelected(isActive ? null : order)}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      {/* Инфо */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-text-primary">
@@ -190,6 +193,11 @@ export default function AdminPage() {
                           }`}>
                             {order.payment_method === 'cash' ? '💵 Наличные' : '💳 Онлайн'}
                           </span>
+                          {order.delivery_note && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                              ⏱ {order.delivery_note}
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-text-secondary mt-1 truncate">
                           {order.customer_name} · {order.customer_phone}
@@ -199,14 +207,33 @@ export default function AdminPage() {
                           {items.length} позиций · {formatDate(order.created_at)}
                         </p>
                       </div>
-
-                      {/* Сумма */}
                       <div className="text-right flex-shrink-0">
                         <p className="font-bold text-text-primary">{formatPrice(order.total)}</p>
                       </div>
                     </div>
 
-                    {/* Кнопки действий */}
+                    {/* Ползунок времени — только для новых заказов при принятии */}
+                    {order.status === 'new' && (
+                      <div className="mt-3 pt-3 border-t border-surface-border"
+                           onClick={e => e.stopPropagation()}>
+                        <p className="text-xs text-text-secondary mb-2">⏱ Время доставки:</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {DELIVERY_OPTIONS.map(opt => (
+                            <button
+                              key={opt.minutes}
+                              onClick={() => setDeliveryTimes(prev => ({ ...prev, [order.id]: opt.minutes }))}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors
+                                ${(deliveryTimes[order.id] ?? 45) === opt.minutes
+                                  ? 'bg-brand text-white'
+                                  : 'bg-surface-section text-text-secondary hover:bg-surface-border'}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {!['completed', 'cancelled'].includes(order.status) && (
                       <div className="flex gap-2 mt-3 pt-3 border-t border-surface-border"
                            onClick={e => e.stopPropagation()}>
@@ -241,19 +268,15 @@ export default function AdminPage() {
                 <h3 className="font-bold text-text-primary">
                   #{selected.id.slice(0, 8).toUpperCase()}
                 </h3>
-                <button onClick={() => setSelected(null)}
-                  className="text-text-muted hover:text-text-primary">
+                <button onClick={() => setSelected(null)} className="text-text-muted hover:text-text-primary">
                   <XCircle size={18} />
                 </button>
               </div>
 
-              {/* Состав */}
               <div className="space-y-2 mb-4">
                 {(selected.items as OrderItemSnapshot[]).map((item, i) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-text-primary">
-                      {item.name} × {item.quantity}
-                    </span>
+                    <span className="text-text-primary">{item.name} × {item.quantity}</span>
                     <span className="text-text-secondary flex-shrink-0 ml-2">
                       {formatPrice(item.price_at_order * item.quantity)}
                     </span>
@@ -274,6 +297,12 @@ export default function AdminPage() {
                   <span>Адрес</span>
                   <span className="text-right max-w-[60%]">{selected.address}</span>
                 </div>
+                {selected.delivery_note && (
+                  <div className="flex justify-between text-text-secondary">
+                    <span>Доставка</span>
+                    <span className="text-green-600 font-medium">{selected.delivery_note}</span>
+                  </div>
+                )}
                 {selected.comment && (
                   <div className="flex justify-between text-text-secondary">
                     <span>Комментарий</span>

@@ -1,4 +1,4 @@
-// Все TypeScript-типы проекта: описывает форму данных для блюд, заказов, пользователей и конфигурации.
+// Все TypeScript-типы проекта
 
 // ─── Категории меню ───────────────────────────────────────────────────────────
 
@@ -17,15 +17,15 @@ export interface Category {
 export type Badge = 'hit' | 'new' | 'spicy' | 'sale' | 'vegan'
 
 export interface Topping {
-  id: string      // uuid, генерируется при создании в ProductForm
-  name: string    // "Халапеньо", "Без лука"
-  price: number   // 0 = бесплатно / убрать ингредиент
+  id: string
+  name: string
+  price: number
 }
 
 export interface ProductSize {
-  id:    string   // генерируется при создании
-  name:  string   // "25 см", "30 см", "35 см"
-  price: number   // финальная цена за этот размер
+  id:    string
+  name:  string
+  price: number
 }
 
 export interface Product {
@@ -43,8 +43,8 @@ export interface Product {
   discount_fixed: number | null
   calories: number | null
   allergens: string[]
-  toppings: Topping[]         // доступные опции для этого блюда
-  sizes: ProductSize[]        // размеры (для пицц и т.п.)
+  toppings: Topping[]
+  sizes: ProductSize[]
   final_price?: number
   sort_order?: number
 }
@@ -54,8 +54,8 @@ export interface Product {
 export interface CartItem {
   product: Product
   quantity: number
-  selectedToppings: Topping[]   // выбранные пользователем
-  cartKey: string               // productId + sorted topping ids — уникальный ключ позиции
+  selectedToppings: Topping[]
+  cartKey: string
 }
 
 // ─── Заказы ───────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export interface OrderItemSnapshot {
   price_at_order: number
   quantity: number
   image_url: string | null
-  selectedToppings: Topping[]   // снимок выбранных топпингов
+  selectedToppings: Topping[]
 }
 
 export interface Order {
@@ -92,9 +92,27 @@ export interface Order {
   payment_status: PaymentStatus
   promo_code_id: string | null
   comment: string | null
+  customer_name: string
+  customer_phone: string
   created_at: string
+  updated_at: string
+  persons: number | null
+  delivery_minutes: number | null   // время доставки в минутах
+  delivery_note: string | null      // текст для клиента "~40 минут"
   user_profile?: UserProfile
   delivery_zone?: DeliveryZone
+}
+
+// ─── Отзывы ───────────────────────────────────────────────────────────────────
+
+export interface OrderReview {
+  id: string
+  order_id: string
+  user_id: string
+  rating: number          // 1–5
+  text: string | null
+  photo_url: string | null
+  created_at: string
 }
 
 // ─── Промокоды ────────────────────────────────────────────────────────────────
