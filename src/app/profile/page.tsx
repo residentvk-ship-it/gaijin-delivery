@@ -74,7 +74,7 @@ export default function ProfilePage() {
       setUserPhone(profile?.phone ?? '')
 
       loadOrders(uid, session.access_token)
-      loadReviews(uid, session.access_token)
+      loadReviews(uid)
     }
     init()
   }, [])
@@ -105,19 +105,18 @@ export default function ProfilePage() {
     setLoading(false)
   }
 
-  async function loadReviews(uid: string, token: string) {
-    try {
-      const res = await fetch(
-        `${URL}/rest/v1/order_reviews?user_id=eq.${uid}&select=*`,
-        { headers: { apikey: ANON, Authorization: `Bearer ${token}` } }
-      )
-      const data = await res.json()
-      if (Array.isArray(data)) {
-        const map: Record<string, OrderReview> = {}
-        data.forEach((r: OrderReview) => { map[r.order_id] = r })
-        setReviews(map)
-      }
-    } catch {}
+  async function loadReviews(uid: string) {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('order_reviews')
+      .select('*')
+      .eq('user_id', uid)
+
+    if (data) {
+      const map: Record<string, OrderReview> = {}
+      data.forEach((r: OrderReview) => { map[r.order_id] = r })
+      setReviews(map)
+    }
   }
 
   async function submitReview(orderId: string) {
@@ -264,7 +263,6 @@ export default function ProfilePage() {
                         <p className="text-xs text-text-muted mt-0.5">
                           {formatDate(order.created_at)} · {items.length} позиций · {formatPrice(order.total)}
                         </p>
-                        {/* Время доставки */}
                         {order.delivery_note && isActive && (
                           <p className="text-xs text-green-600 font-medium mt-0.5">
                             ⏱ {order.delivery_note}
@@ -334,7 +332,6 @@ export default function ProfilePage() {
                               </div>
                             ) : reviewing === order.id ? (
                               <div className="space-y-3">
-                                {/* Звёзды */}
                                 <div className="flex items-center gap-1">
                                   {Array.from({ length: 5 }).map((_, i) => (
                                     <button key={i} onClick={() => setRevRating(i + 1)}>
@@ -356,8 +353,7 @@ export default function ProfilePage() {
                                     onChange={e => setRevPhoto(e.target.files?.[0] ?? null)} />
                                 </label>
                                 <div className="flex gap-2">
-                                  <button onClick={() => submitReview(order.id)}
-                                    disabled={revSaving}
+                                  <button onClick={() => submitReview(order.id)} disabled={revSaving}
                                     className="btn-primary flex-1 py-2 text-sm flex items-center justify-center gap-1.5">
                                     {revSaving && <Loader2 size={14} className="animate-spin" />}
                                     Отправить
@@ -369,8 +365,7 @@ export default function ProfilePage() {
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setReviewing(order.id)}
+                              <button onClick={() => setReviewing(order.id)}
                                 className="w-full py-2 text-sm text-brand border border-brand/30 rounded-btn hover:bg-brand/5 transition-colors flex items-center justify-center gap-1.5">
                                 <Star size={14} /> Оставить отзыв
                               </button>
