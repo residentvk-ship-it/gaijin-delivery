@@ -1,9 +1,7 @@
-// Панель статистики: выручка, заказы, популярные блюда, графики по дням.
-
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, ShoppingBag, Users, Clock } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Users, Clock, Star } from 'lucide-react'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 
 interface OrderItem {
@@ -20,6 +18,14 @@ interface Order {
   created_at: string
   customer_name: string | null
   payment_method: string
+}
+
+interface Review {
+  id: string
+  order_id: string
+  rating: number
+  text: string | null
+  created_at: string
 }
 
 interface DayStat {
@@ -45,8 +51,20 @@ const h = {
 
 type Period = 'today' | 'week' | 'month' | 'all' | 'custom'
 
+function StarRow({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} size={14}
+          className={i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'} />
+      ))}
+    </div>
+  )
+}
+
 export function StatsPanel() {
   const [orders,   setOrders]   = useState<Order[]>([])
+  const [reviews,  setReviews]  = useState<Review[]>([])
   const [loading,  setLoading]  = useState(true)
   const [period,   setPeriod]   = useState<Period>('week')
   const [dateFrom, setDateFrom] = useState('')
@@ -56,33 +74,30 @@ export function StatsPanel() {
 
   async function load() {
     setLoading(true)
-    const res  = await fetch(
-      `${SUPA_URL}/rest/v1/orders?order=created_at.desc&limit=500`,
-      { headers: h }
-    )
-    const data = await res.json()
-    setOrders(Array.isArray(data) ? data : [])
+    const [ordersRes, reviewsRes] = await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/orders?order=created_at.desc&limit=500`, { headers: h }).then(r => r.json()),
+      fetch(`${SUPA_URL}/rest/v1/order_reviews?select=id,order_id,rating,text,created_at&order=created_at.desc`, { headers: h }).then(r => r.json()),
+    ])
+    setOrders(Array.isArray(ordersRes) ? ordersRes : [])
+    setReviews(Array.isArray(reviewsRes) ? reviewsRes : [])
     setLoading(false)
   }
 
-  function filterByPeriod(orders: Order[]) {
-    if (period === 'all') return orders
+  function filterByPeriod<T extends { created_at: string }>(items: T[]): T[] {
+    if (period === 'all') return items
     if (period === 'custom') {
-      if (!dateFrom || !dateTo) return orders
+      if (!dateFrom || !dateTo) return items
       const from = new Date(dateFrom)
       const to   = new Date(dateTo)
       to.setHours(23, 59, 59, 999)
-      return orders.filter(o => {
-        const d = new Date(o.created_at)
-        return d >= from && d <= to
-      })
+      return items.filter(o => { const d = new Date(o.created_at); return d >= from && d <= to })
     }
     const now  = new Date()
     const from = new Date()
     if (period === 'today') from.setHours(0, 0, 0, 0)
     if (period === 'week')  from.setDate(now.getDate() - 7)
     if (period === 'month') from.setDate(now.getDate() - 30)
-    return orders.filter(o => new Date(o.created_at) >= from)
+    return items.filter(o => new Date(o.created_at) >= from)
   }
 
   const filtered   = filterByPeriod(orders)
@@ -92,6 +107,16 @@ export function StatsPanel() {
   const revenue    = completed.reduce((s, o) => s + o.total, 0)
   const avgOrder   = completed.length ? Math.round(revenue / completed.length) : 0
 
+  // Отзывы за период
+  const filteredReviews = filterByPeriod(reviews)
+  const avgRating = filteredReviews.length
+    ? Math.round((filteredReviews.reduce((s, r) => s + r.rating, 0) / filteredReviews.length) * 10) / 10
+    : 0
+  const ratingDist = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: filteredReviews.filter(r => r.rating === star).length,
+  }))
+
   // Статистика по дням
   const dayStats: DayStat[] = []
   const days = period === 'today' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 0
@@ -100,10 +125,7 @@ export function StatsPanel() {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const dateStr = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
-      const dayOrders = completed.filter(o => {
-        const od = new Date(o.created_at)
-        return od.toDateString() === d.toDateString()
-      })
+      const dayOrders = completed.filter(o => new Date(o.created_at).toDateString() === d.toDateString())
       dayStats.push({
         date:    dateStr,
         revenue: dayOrders.reduce((s, o) => s + o.total, 0),
@@ -116,25 +138,18 @@ export function StatsPanel() {
   const productMap: Record<string, ProductStat> = {}
   completed.forEach(o => {
     o.items.forEach(item => {
-      if (!productMap[item.name]) {
-        productMap[item.name] = { name: item.name, count: 0, revenue: 0 }
-      }
+      if (!productMap[item.name]) productMap[item.name] = { name: item.name, count: 0, revenue: 0 }
       productMap[item.name].count   += item.quantity
       productMap[item.name].revenue += item.price_at_order * item.quantity
     })
   })
-  const topProducts = Object.values(productMap)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-
-  const maxRevenue = Math.max(...dayStats.map(d => d.revenue), 1)
+  const topProducts = Object.values(productMap).sort((a, b) => b.count - a.count).slice(0, 5)
+  const maxRevenue  = Math.max(...dayStats.map(d => d.revenue), 1)
 
   if (loading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1,2,3,4].map(i => (
-          <div key={i} className="bg-white rounded-card h-24 animate-pulse" />
-        ))}
+        {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-card h-24 animate-pulse" />)}
       </div>
     )
   }
@@ -156,29 +171,16 @@ export function StatsPanel() {
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors
                 ${period === p.value
                   ? 'bg-brand text-white'
-                  : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'
-                }`}>
+                  : 'bg-white border border-surface-border text-text-secondary hover:border-brand hover:text-brand'}`}>
               {p.label}
             </button>
           ))}
         </div>
-
-        {/* Поля дат для кастомного интервала */}
         {period === 'custom' && (
           <div className="flex items-center gap-2 mt-3">
-            <input
-              type="date"
-              className="input text-sm"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-            />
+            <input type="date" className="input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
             <span className="text-text-muted">—</span>
-            <input
-              type="date"
-              className="input text-sm"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-            />
+            <input type="date" className="input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
         )}
       </div>
@@ -186,10 +188,10 @@ export function StatsPanel() {
       {/* Карточки метрик */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Выручка',     value: formatPrice(revenue),    icon: TrendingUp, color: 'text-green-600',  bg: 'bg-green-50'  },
-          { label: 'Заказов',     value: String(filtered.length), icon: ShoppingBag, color: 'text-brand',     bg: 'bg-red-50'    },
-          { label: 'Средний чек', value: formatPrice(avgOrder),   icon: Users,       color: 'text-blue-600',  bg: 'bg-blue-50'   },
-          { label: 'Активных',    value: String(active.length),   icon: Clock,       color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: 'Выручка',     value: formatPrice(revenue),    icon: TrendingUp,  color: 'text-green-600',   bg: 'bg-green-50'  },
+          { label: 'Заказов',     value: String(filtered.length), icon: ShoppingBag, color: 'text-brand',       bg: 'bg-red-50'    },
+          { label: 'Средний чек', value: formatPrice(avgOrder),   icon: Users,       color: 'text-blue-600',    bg: 'bg-blue-50'   },
+          { label: 'Активных',    value: String(active.length),   icon: Clock,       color: 'text-yellow-600',  bg: 'bg-yellow-50' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-card shadow-card p-4">
             <div className={`w-10 h-10 rounded-btn ${bg} flex items-center justify-center mb-3`}>
@@ -201,7 +203,7 @@ export function StatsPanel() {
         ))}
       </div>
 
-      {/* График выручки по дням */}
+      {/* График выручки */}
       {dayStats.length > 1 && (
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">Выручка по дням</h3>
@@ -230,7 +232,6 @@ export function StatsPanel() {
 
       {/* Топ блюд + последние заказы */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">🏆 Топ блюд</h3>
           {topProducts.length === 0 ? (
@@ -244,10 +245,8 @@ export function StatsPanel() {
                     <p className="text-sm font-medium text-text-primary truncate">{p.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <div className="h-1.5 bg-brand/20 rounded-full flex-1">
-                        <div
-                          className="h-full bg-brand rounded-full"
-                          style={{ width: `${(p.count / topProducts[0].count) * 100}%` }}
-                        />
+                        <div className="h-full bg-brand rounded-full"
+                          style={{ width: `${(p.count / topProducts[0].count) * 100}%` }} />
                       </div>
                       <span className="text-xs text-text-muted flex-shrink-0">{p.count} шт</span>
                     </div>
@@ -282,6 +281,65 @@ export function StatsPanel() {
                       'bg-yellow-100 text-yellow-700'}`}>
                     {ORDER_STATUS_LABELS[o.status]}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Отзывы */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-card shadow-card p-5">
+          <h3 className="font-semibold text-text-primary mb-4">⭐ Рейтинг отзывов</h3>
+          {filteredReviews.length === 0 ? (
+            <p className="text-text-muted text-sm text-center py-4">Отзывов пока нет</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Средний балл */}
+              <div className="flex items-center gap-4">
+                <p className="text-5xl font-bold text-text-primary">{avgRating}</p>
+                <div>
+                  <StarRow rating={Math.round(avgRating)} />
+                  <p className="text-xs text-text-muted mt-1">{filteredReviews.length} отзывов</p>
+                </div>
+              </div>
+              {/* Распределение */}
+              <div className="space-y-1.5">
+                {ratingDist.map(({ star, count }) => (
+                  <div key={star} className="flex items-center gap-2">
+                    <span className="text-xs text-text-muted w-4 text-right">{star}</span>
+                    <Star size={11} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                    <div className="flex-1 h-2 bg-surface-section rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-yellow-400 rounded-full transition-all"
+                        style={{ width: filteredReviews.length ? `${(count / filteredReviews.length) * 100}%` : '0%' }}
+                      />
+                    </div>
+                    <span className="text-xs text-text-muted w-6 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Последние отзывы */}
+        <div className="bg-white rounded-card shadow-card p-5">
+          <h3 className="font-semibold text-text-primary mb-4">💬 Последние отзывы</h3>
+          {filteredReviews.length === 0 ? (
+            <p className="text-text-muted text-sm text-center py-4">Отзывов пока нет</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredReviews.slice(0, 5).map(r => (
+                <div key={r.id} className="space-y-1 pb-2 border-b border-surface-border last:border-0">
+                  <div className="flex items-center justify-between">
+                    <StarRow rating={r.rating} />
+                    <span className="text-xs text-text-muted">
+                      {new Date(r.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                  {r.text && <p className="text-sm text-text-secondary line-clamp-2">{r.text}</p>}
                 </div>
               ))}
             </div>
