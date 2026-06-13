@@ -42,23 +42,12 @@ const DELIVERY_OPTIONS = [
 ]
 
 export default function AdminPage() {
-  const [orders,       setOrders]       = useState<Order[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [selected,     setSelected]     = useState<Order | null>(null)
-  const [filterStatus, setFilterStatus] = useState<string>('active')
-  // orderId → выбранное время для заказа который принимаем
+  const [orders,        setOrders]        = useState<Order[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [selected,      setSelected]      = useState<Order | null>(null)
+  const [filterStatus,  setFilterStatus]  = useState<string>('active')
   const [deliveryTimes, setDeliveryTimes] = useState<Record<string, number>>({})
-  const [reviews, setReviews] = useState<Record<string, any>>({})
-
-  async function loadReview(orderId: string) {
-    if (orderId in reviews) return
-    const { data } = await supabase
-      .from('order_reviews')
-      .select('*')
-      .eq('order_id', orderId)
-      .single()
-    setReviews(prev => ({ ...prev, [orderId]: data ?? null }))
-  }
+  const [reviews,       setReviews]       = useState<Record<string, any>>({})
 
   const supabase = createClient()
 
@@ -91,22 +80,28 @@ export default function AdminPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  async function loadReview(orderId: string) {
+    if (orderId in reviews) return
+    const { data } = await supabase
+      .from('order_reviews')
+      .select('*')
+      .eq('order_id', orderId)
+      .single()
+    setReviews(prev => ({ ...prev, [orderId]: data ?? null }))
+  }
+
   async function updateStatus(order: Order, status: OrderStatus) {
     const extra: Partial<Order> = {}
-
-    // При принятии заказа сохраняем время доставки
     if (status === 'accepted') {
       const mins = deliveryTimes[order.id] ?? 45
       const opt  = DELIVERY_OPTIONS.find(o => o.minutes === mins) ?? DELIVERY_OPTIONS[1]
       extra.delivery_minutes = mins
       extra.delivery_note    = `Ожидайте ${opt.label}`
     }
-
     const { error } = await supabase
       .from('orders')
       .update({ status, ...extra })
       .eq('id', order.id)
-
     if (error) toast.error('Ошибка: ' + error.message)
     else toast.success(`Статус → ${ORDER_STATUS_LABELS[status]}`)
   }
@@ -186,7 +181,11 @@ export default function AdminPage() {
                   <div key={order.id}
                     className={`bg-white rounded-card shadow-card p-4 transition-all cursor-pointer
                       ${isActive ? 'ring-2 ring-brand' : 'hover:shadow-card-hover'}`}
-                    onClick={() => { setSelected(isActive ? null : order); if (!isActive) loadReview(order.id) }}}
+                    onClick={() => {
+                      const opening = selected?.id !== order.id
+                      setSelected(opening ? order : null)
+                      if (opening) loadReview(order.id)
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -223,7 +222,6 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Ползунок времени — только для новых заказов при принятии */}
                     {order.status === 'new' && (
                       <div className="mt-3 pt-3 border-t border-surface-border"
                            onClick={e => e.stopPropagation()}>
