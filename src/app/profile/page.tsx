@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Package, User, ChevronRight, Clock, CheckCircle2, ChefHat, Bike, XCircle, Phone, Lock, Loader2, Star, Camera } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useCartStore } from '@/store/cart'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS, maskPhone } from '@/lib/utils'
-import type { Order, OrderItemSnapshot, OrderReview } from '@/types'
+import type { Order, OrderItemSnapshot, OrderReview, Product, Topping } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
   new:        'bg-blue-100 text-blue-700',
@@ -29,6 +30,7 @@ type Tab = 'orders' | 'profile'
 
 export default function ProfilePage() {
   const router = useRouter()
+  const { addItem, openCart } = useCartStore()
   const [tab,        setTab]        = useState<Tab>('orders')
   const [orders,     setOrders]     = useState<Order[]>([])
   const [loading,    setLoading]    = useState(true)
@@ -49,6 +51,7 @@ export default function ProfilePage() {
   const [revText,    setRevText]    = useState('')
   const [revPhoto,   setRevPhoto]   = useState<File | null>(null)
   const [revSaving,  setRevSaving]  = useState(false)
+  const [repeatingId, setRepeatingId] = useState<string | null>(null)
 
   const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -152,6 +155,54 @@ export default function ProfilePage() {
       setRevRating(5)
     }
     setRevSaving(false)
+  }
+
+  // Повторить заказ: подтягиваем АКТУАЛЬНЫЕ версии товаров (цены/составы могли поменяться)
+  // и докладываем их в корзину поверх того, что там уже лежит.
+  // Товары, которые с тех пор сняли с продажи — пропускаем и сообщаем об этом.
+  async function repeatOrder(order: Order) {
+    setRepeatingId(order.id)
+    const supabase = createClient()
+    const productIds = Array.from(new Set(order.items.map(i => i.product_id)))
+
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', productIds)
+
+    const liveMap = new Map<string, Product>((products ?? []).map((p: Product) => [p.id, p]))
+    const skipped: string[] = []
+
+    for (const item of order.items) {
+      const live = liveMap.get(item.product_id)
+      if (!live || !live.is_visible) { skipped.push(item.name); continue }
+
+      const sizeTopping = item.selectedToppings.find(t => t.id.startsWith('size-'))
+
+      if (sizeTopping) {
+        // Это была позиция с размером (например, вок) — ищем такой же размер в текущем меню
+        const sizeId   = sizeTopping.id.replace('size-', '')
+        const liveSize = (live.sizes ?? []).find(s => s.id === sizeId)
+        if (!liveSize) { skipped.push(item.name); continue }
+
+        const sizedProduct = { ...live, price: liveSize.price, final_price: liveSize.price }
+        const sizeAsTopping: Topping[] = [{ id: `size-${liveSize.id}`, name: liveSize.name, price: 0 }]
+        for (let n = 0; n < item.quantity; n++) addItem(sizedProduct, sizeAsTopping)
+      } else {
+        // Обычная позиция — переносим только те топпинги, которые до сих пор есть в меню
+        const liveToppings = item.selectedToppings
+          .map(t => (live.toppings ?? []).find(lt => lt.id === t.id))
+          .filter((t): t is Topping => !!t)
+        for (let n = 0; n < item.quantity; n++) addItem(live, liveToppings)
+      }
+    }
+
+    setRepeatingId(null)
+    openCart()
+
+    if (skipped.length > 0) {
+      alert(`Эти позиции больше недоступны и не добавлены: ${skipped.join(', ')}`)
+    }
   }
 
   async function saveProfile() {
@@ -373,9 +424,14 @@ export default function ProfilePage() {
                           </div>
                         )}
 
-                        <a href="/" className="btn-secondary w-full text-center text-sm py-2 block mt-1">
+                        <button
+                          onClick={() => repeatOrder(order)}
+                          disabled={repeatingId === order.id}
+                          className="btn-secondary w-full text-center text-sm py-2 flex items-center justify-center gap-1.5 mt-1 disabled:opacity-50"
+                        >
+                          {repeatingId === order.id && <Loader2 size={14} className="animate-spin" />}
                           🔄 Повторить заказ
-                        </a>
+                        </button>
                       </div>
                     )}
                   </div>
