@@ -372,10 +372,7 @@ export default function ProfilePage() {
                             )}
                           </div>
                         )}
-
-                        <a href="/" className="btn-secondary w-full text-center text-sm py-2 block mt-1">
-                          🔄 Повторить заказ
-                        </a>
+                
                       </div>
                     )}
                   </div>
