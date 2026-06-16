@@ -1,53 +1,63 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
-import { X } from 'lucide-react'
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { X } from "lucide-react";
 
 interface Banner {
-  id: string
-  title: string | null
-  image_url: string
-  content?: string | null
+  id: string;
+  title: string | null;
+  image_url: string;
+  content?: string | null;
 }
 
 interface Props {
-  banner: Banner | null
-  onClose: () => void
+  banner: Banner | null;
+  onClose: () => void;
 }
 
 export function BannerModal({ banner, onClose }: Props) {
-  const [content, setContent] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   useEffect(() => {
-    document.body.style.overflow = banner ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [banner])
+    document.body.style.overflow = banner ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [banner]);
 
   // Если контент не передан — догружаем с сервера
   useEffect(() => {
-    if (!banner) { setContent(null); return }
-    if ('content' in banner) { setContent(banner.content ?? null); return }
+    if (!banner) {
+      setContent(null);
+      return;
+    }
+    if ("content" in banner) {
+      setContent(banner.content ?? null);
+      return;
+    }
 
-    setLoading(true)
-    const ANON     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    setLoading(true);
+    const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     fetch(`${SUPA_URL}/rest/v1/banners?id=eq.${banner.id}&select=content`, {
       headers: { apikey: ANON, Authorization: `Bearer ${ANON}` },
     })
-      .then(r => r.json())
-      .then(d => setContent(d?.[0]?.content ?? null))
-      .finally(() => setLoading(false))
-  }, [banner?.id])
+      .then((r) => r.json())
+      .then((d) => setContent(d?.[0]?.content ?? null))
+      .finally(() => setLoading(false));
+  }, [banner?.id]);
 
-  if (!banner) return null
+  if (!banner) return null;
 
   return (
     <div
@@ -55,9 +65,9 @@ export function BannerModal({ banner, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl
-                   max-h-[95dvh] overflow-y-auto animate-slide-up shadow-modal"
-        onClick={e => e.stopPropagation()}
+        className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md
+                   max-h-[60dvh] overflow-y-auto animate-slide-up shadow-modal"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Фото */}
         <div className="relative">
@@ -69,13 +79,13 @@ export function BannerModal({ banner, onClose }: Props) {
           >
             <X size={16} />
           </button>
-          <div className="relative w-full rounded-t-2xl overflow-hidden">
+          <div className="relative w-full max-h-[200px] overflow-hidden rounded-t-2xl">
             <Image
               src={banner.image_url}
-              alt={banner.title ?? 'Акция'}
+              alt={banner.title ?? "Акция"}
               width={800}
               height={400}
-              className="w-full h-auto object-contain"
+              className="w-full h-full object-cover"
               priority
             />
           </div>
@@ -84,7 +94,9 @@ export function BannerModal({ banner, onClose }: Props) {
         {/* Контент */}
         <div className="p-5 flex flex-col gap-3">
           {banner.title && (
-            <h2 className="text-text-primary text-xl font-bold">{banner.title}</h2>
+            <h2 className="text-text-primary text-xl font-bold">
+              {banner.title}
+            </h2>
           )}
 
           {loading ? (
@@ -92,13 +104,17 @@ export function BannerModal({ banner, onClose }: Props) {
           ) : content ? (
             <div
               className="prose prose-sm max-w-none text-text-secondary leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br/>') }}
+              dangerouslySetInnerHTML={{
+                __html: content.replace(/\n/g, "<br/>"),
+              }}
             />
           ) : (
-            <p className="text-text-muted text-sm">Подробности акции скоро появятся.</p>
+            <p className="text-text-muted text-sm">
+              Подробности акции скоро появятся.
+            </p>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
