@@ -13,17 +13,17 @@ const nextConfig = {
   output: 'standalone',
   images: {
     formats: ['image/webp'],
-    minimumCacheTTL: 60 * 60 * 24 * 7, // 7 дней
+    minimumCacheTTL: 60 * 60 * 24 * 7,
     deviceSizes: [390, 768, 1024, 1280],
     imageSizes: [64, 128, 256, 384],
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.supabase.co',
+        hostname: 'api.u4kuduk.ru',
       },
       {
         protocol: 'https',
-        hostname: '**.supabase.in',
+        hostname: 'u4kuduk.ru',
       },
     ],
   },
