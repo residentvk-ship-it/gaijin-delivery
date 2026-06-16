@@ -211,7 +211,7 @@ export function ProductModal({ product, onClose }: Props) {
             </div>
 
             {quantity === 0 ? (
-              <button onClick={handleAdd} className="btn-primary flex items-center gap-2">
+              <button onClick={() => { handleAdd(); onClose() }} className="btn-primary flex items-center gap-2">
                 <Plus size={16} /> В корзину
               </button>
             ) : (
