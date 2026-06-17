@@ -114,6 +114,8 @@ export default function CheckoutPage() {
     setTimeout(() => {
       clearCart()
   }, 50)
+}
+  
 
   // Показываем пустой экран пока грузится localStorage
   if (!hydrated) return null
