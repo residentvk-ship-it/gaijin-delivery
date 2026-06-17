@@ -145,7 +145,7 @@ export function CartDrawer() {
     }
     clearCart(); closeCart()
     toast.success('Заказ оформлен!')
-    window.location.href = `/order/${order.id}`
+    window.location.href = `/`
   }
 
   return (
