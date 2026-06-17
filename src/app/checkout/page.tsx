@@ -107,7 +107,7 @@ export default function CheckoutPage() {
 
     clearCart()
     toast.success('Заказ оформлен!')
-    router.push(`/order/${order.id}`)
+    router.push(`/`)
   }
 
   // Показываем пустой экран пока грузится localStorage

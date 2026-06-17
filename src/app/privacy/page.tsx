@@ -13,7 +13,7 @@ export default function PrivacyPage() {
         <h1 className="text-2xl font-bold text-text-primary mb-2">
           Политика обработки персональных данных
         </h1>
-        <p className="text-text-muted text-sm mb-8">Последнее обновление: 1 января 2025 г.</p>
+        <p className="text-text-muted text-sm mb-8">Последнее обновление: 17 июня 2026 г.</p>
 
         <div className="space-y-8 text-text-secondary text-sm leading-relaxed">
 
