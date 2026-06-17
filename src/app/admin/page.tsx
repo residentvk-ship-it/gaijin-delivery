@@ -7,9 +7,13 @@ import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order, OrderStatus, OrderItemSnapshot } from '@/types'
 import toast from 'react-hot-toast'
 
+// Раньше: new -> accepted -> cooking -> delivering -> completed (4 клика админа)
+// Сейчас: новый заказ принимается одним кликом "Принять" и сразу уходит в "delivering".
+// accepted/cooking оставлены в мапе на случай старых/легаси заказов с такими статусами —
+// если такой заказ встретится, кнопка всё равно доведёт его до "delivering".
 const STATUS_FLOW: Record<OrderStatus, OrderStatus | null> = {
-  new:        'accepted',
-  accepted:   'cooking',
+  new:        'delivering',
+  accepted:   'delivering',
   cooking:    'delivering',
   delivering: 'completed',
   completed:  null,
@@ -27,7 +31,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 const STATUS_NEXT_LABEL: Record<string, string> = {
   new:        '✅ Принять',
-  accepted:   '👨‍🍳 Готовится',
+  accepted:   '🛵 Доставляется',
   cooking:    '🛵 Доставляется',
   delivering: '🎉 Выполнен',
 }
@@ -92,12 +96,19 @@ export default function AdminPage() {
 
   async function updateStatus(order: Order, status: OrderStatus) {
     const extra: Partial<Order> = {}
-    if (status === 'accepted') {
-      const mins = deliveryTimes[order.id] ?? 45
-      const opt  = DELIVERY_OPTIONS.find(o => o.minutes === mins) ?? DELIVERY_OPTIONS[1]
-      extra.delivery_minutes = mins
-      extra.delivery_note    = `Ожидайте ${opt.label}`
+
+    // Время доставки теперь не проставляется автоматически.
+    // Если админ явно выбрал вариант на этом заказе — отправляем его.
+    // Если не выбрал — extra остаётся пустым, никакого "по умолчанию 45 мин".
+    const mins = deliveryTimes[order.id]
+    if (status === 'delivering' && mins) {
+      const opt = DELIVERY_OPTIONS.find(o => o.minutes === mins)
+      if (opt) {
+        extra.delivery_minutes = mins
+        extra.delivery_note    = `Ожидайте ${opt.label}`
+      }
     }
+
     const { error } = await supabase
       .from('orders')
       .update({ status, ...extra })
@@ -225,14 +236,22 @@ export default function AdminPage() {
                     {order.status === 'new' && (
                       <div className="mt-3 pt-3 border-t border-surface-border"
                            onClick={e => e.stopPropagation()}>
-                        <p className="text-xs text-text-secondary mb-2">⏱ Время доставки:</p>
+                        <p className="text-xs text-text-secondary mb-2">⏱ Время доставки (необязательно):</p>
                         <div className="flex gap-1.5 flex-wrap">
                           {DELIVERY_OPTIONS.map(opt => (
                             <button
                               key={opt.minutes}
-                              onClick={() => setDeliveryTimes(prev => ({ ...prev, [order.id]: opt.minutes }))}
+                              onClick={() => setDeliveryTimes(prev => {
+                                const next = { ...prev }
+                                if (next[order.id] === opt.minutes) {
+                                  delete next[order.id] // повторный клик снимает выбор
+                                } else {
+                                  next[order.id] = opt.minutes
+                                }
+                                return next
+                              })}
                               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors
-                                ${(deliveryTimes[order.id] ?? 45) === opt.minutes
+                                ${deliveryTimes[order.id] === opt.minutes
                                   ? 'bg-brand text-white'
                                   : 'bg-surface-section text-text-secondary hover:bg-surface-border'}`}
                             >
