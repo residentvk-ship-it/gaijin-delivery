@@ -105,10 +105,15 @@ export default function CheckoutPage() {
       sessionStorage.removeItem('promo')
     }
 
-    clearCart()
     toast.success('Заказ оформлен!')
+
+     // 1. Сначала отправляем пользователя на главную
     router.push(`/`)
-  }
+
+    // 2. Чуть-чуть придерживаем очистку корзины, чтобы не сработал лишний редирект
+    setTimeout(() => {
+      clearCart()
+  }, 50)
 
   // Показываем пустой экран пока грузится localStorage
   if (!hydrated) return null
