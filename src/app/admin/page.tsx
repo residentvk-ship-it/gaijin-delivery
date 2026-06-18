@@ -45,13 +45,18 @@ const DELIVERY_OPTIONS = [
   { minutes: 180, label: '3+ часа' },
 ]
 
+// Страховочный поллинг: даже если websocket тихо умер и фокус на вкладку
+// не возвращался, данные всё равно не "протухнут" больше, чем на этот интервал.
+const POLL_INTERVAL_MS = 20000
+
 export default function AdminPage() {
-  const [orders,        setOrders]        = useState<Order[]>([])
-  const [loading,       setLoading]       = useState(true)
-  const [selected,      setSelected]      = useState<Order | null>(null)
-  const [filterStatus,  setFilterStatus]  = useState<string>('active')
-  const [deliveryTimes, setDeliveryTimes] = useState<Record<string, number>>({})
-  const [reviews,       setReviews]       = useState<Record<string, any>>({})
+  const [orders,         setOrders]         = useState<Order[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [selected,       setSelected]       = useState<Order | null>(null)
+  const [filterStatus,   setFilterStatus]   = useState<string>('active')
+  const [deliveryTimes,  setDeliveryTimes]  = useState<Record<string, number>>({})
+  const [reviews,        setReviews]        = useState<Record<string, any>>({})
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting')
 
   const supabase = createClient()
 
@@ -67,21 +72,56 @@ export default function AdminPage() {
 
   useEffect(() => {
     load()
-    const channel = supabase
-      .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setOrders(prev => [payload.new as Order, ...prev])
-          toast('🆕 Новый заказ!', { duration: 6000, icon: '🔔' })
-        }
-        if (payload.eventType === 'UPDATE') {
-          const updated = payload.new as Order
-          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o))
-          setSelected(prev => prev?.id === updated.id ? updated : prev)
-        }
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    function subscribeRealtime() {
+      channel = supabase
+        .channel('admin-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setOrders(prev => [payload.new as Order, ...prev])
+            toast('🆕 Новый заказ!', { duration: 6000, icon: '🔔' })
+          }
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Order
+            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o))
+            setSelected(prev => prev?.id === updated.id ? updated : prev)
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setRealtimeStatus('live')
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // Канал отвалился — не ждём, пока supabase-js сам разберётся,
+            // сразу подтягиваем актуальные данные руками
+            setRealtimeStatus('reconnecting')
+            load()
+          }
+        })
+    }
+
+    subscribeRealtime()
+
+    // Страховка №1: вернулись на вкладку/в окно — сразу подтягиваем свежие данные.
+    // Самый частый случай "устаревшего экрана": браузер свернули,
+    // соединение тихо умерло, вернулись — а на экране старые заказы.
+    function onFocusOrVisible() {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onFocusOrVisible)
+    window.addEventListener('focus', onFocusOrVisible)
+
+    // Страховка №2: лёгкий фоновый поллинг на случай, если websocket
+    // молча умер, а вкладка всё это время была активна на экране.
+    const pollTimer = setInterval(load, POLL_INTERVAL_MS)
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onFocusOrVisible)
+      window.removeEventListener('focus', onFocusOrVisible)
+      clearInterval(pollTimer)
+    }
   }, [])
 
   async function loadReview(orderId: string) {
@@ -145,6 +185,15 @@ export default function AdminPage() {
                 {activeCount}
               </span>
             )}
+            <span
+              className="flex items-center gap-1.5 text-xs text-text-muted ml-1"
+              title={realtimeStatus === 'live' ? 'Обновления в реальном времени' : 'Подключение...'}
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'live' ? 'bg-green-500' : 'bg-yellow-400 animate-pulse'
+              }`} />
+              {realtimeStatus === 'live' ? 'live' : '...'}
+            </span>
           </div>
           <a href="/" className="text-sm text-text-secondary hover:text-brand transition-colors">← На сайт</a>
         </div>
