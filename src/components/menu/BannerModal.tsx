@@ -54,13 +54,15 @@ export function BannerModal({ banner, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60"
       onClick={onClose}
     >
+      {/* max-h ограничивает всю карточку, overflow-hidden — снаружи никогда не скроллится */}
       <div
         className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl
-                   max-h-[95dvh] overflow-y-auto animate-slide-up shadow-modal"
+                   max-h-[90dvh] flex flex-col overflow-hidden animate-slide-up shadow-modal"
         onClick={e => e.stopPropagation()}
       >
-        {/* Фото */}
-        <div className="relative">
+        {/* Фото: высота фиксирована заранее (h-[42dvh]) — независимо от того,
+            загрузилась картинка или нет. Поэтому никакого скачка размера при загрузке. */}
+        <div className="relative shrink-0 h-[42dvh] bg-surface-section">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90
@@ -69,20 +71,19 @@ export function BannerModal({ banner, onClose }: Props) {
           >
             <X size={16} />
           </button>
-          <div className="relative w-full rounded-t-2xl overflow-hidden">
-            <Image
-              src={banner.image_url}
-              alt={banner.title ?? 'Акция'}
-              width={800}
-              height={400}
-              className="w-full h-auto object-contain"
-              priority
-            />
-          </div>
+          <Image
+            src={banner.image_url}
+            alt={banner.title ?? 'Акция'}
+            fill
+            sizes="(max-width: 640px) 100vw, 672px"
+            className="object-contain"
+            priority
+          />
         </div>
 
-        {/* Контент */}
-        <div className="p-5 flex flex-col gap-3">
+        {/* Контент: забирает оставшееся место. Если текста очень много —
+            скроллится только этот блок, а не всё окно. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 flex flex-col gap-3">
           {banner.title && (
             <h2 className="text-text-primary text-xl font-bold">{banner.title}</h2>
           )}
