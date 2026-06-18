@@ -97,6 +97,16 @@ export default function CheckoutPage() {
       return
     }
 
+    // Письмо-уведомление о заказе. Не ждём ответа и не падаем, если не отправится —
+    // заказ уже сохранён в базе, это просто дополнительное уведомление по почте.
+    // keepalive нужен, чтобы запрос успел уйти даже несмотря на router.push() ниже.
+    fetch('/api/notify-order', {
+      method:    'POST',
+      headers:   { 'Content-Type': 'application/json' },
+      body:      JSON.stringify(order),
+      keepalive: true,
+    }).catch(() => {})
+
     if (promoCode) {
       await supabase
         .from('promo_codes')
