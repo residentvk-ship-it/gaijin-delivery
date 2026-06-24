@@ -11,6 +11,12 @@ const pwaConfig = withPWA({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+
+  // Говорим Next.js не трогать nodemailer вебпаком — он должен
+  // оставаться обычным Node.js модулем, иначе в standalone-сборке
+  // он молча ломается и письма не отправляются.
+  serverExternalPackages: ['nodemailer'],
+
   images: {
     formats: ['image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 7,
