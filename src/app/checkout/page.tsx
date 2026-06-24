@@ -11,6 +11,7 @@ import { formatPrice, calcFinalPrice } from '@/lib/utils'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
+import { createOrderAction } from './actions'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -64,7 +65,6 @@ export default function CheckoutPage() {
     if (!form.address.trim()) { toast.error('Введите адрес');   return }
 
     setSubmitting(true)
-    const supabase = createClient()
 
     const orderItems = items.map(({ product, quantity }) => ({
       product_id:     product.id,
@@ -74,40 +74,28 @@ export default function CheckoutPage() {
       image_url:      product.image_url,
     }))
 
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert({
-        status:         'new',
-        items:          orderItems,
-        total,
-        address:        form.address.trim(),
-        comment:        form.comment.trim() || null,
-        payment_method: form.payment_method,
-        payment_status: 'pending',
-        promo_code_id:  promoCode?.id ?? null,
-        customer_name:  form.name.trim(),
-        customer_phone: form.phone.trim(),
-      })
-      .select()
-      .single()
+    // Создание заказа + отправка письма теперь полностью на сервере (Server Action).
+    // Браузеру не нужно делать отдельный fetch — значит блокировщики рекламы,
+    // обрыв соединения при редиректе и подобные штуки тут больше не помеха.
+    const result = await createOrderAction({
+      total,
+      address:        form.address.trim(),
+      comment:        form.comment.trim() || null,
+      payment_method: form.payment_method,
+      promo_code_id:  promoCode?.id ?? null,
+      customer_name:  form.name.trim(),
+      customer_phone: form.phone.trim(),
+      items:          orderItems,
+    })
 
-    if (error || !order) {
-      toast.error('Ошибка оформления: ' + (error?.message ?? 'неизвестная ошибка'))
+    if (!result.ok) {
+      toast.error('Ошибка оформления: ' + result.error)
       setSubmitting(false)
       return
     }
 
-    // Письмо-уведомление о заказе. Не ждём ответа и не падаем, если не отправится —
-    // заказ уже сохранён в базе, это просто дополнительное уведомление по почте.
-    // keepalive нужен, чтобы запрос успел уйти даже несмотря на router.push() ниже.
-    fetch('/api/notify-order', {
-      method:    'POST',
-      headers:   { 'Content-Type': 'application/json' },
-      body:      JSON.stringify(order),
-      keepalive: true,
-    }).catch(() => {})
-
     if (promoCode) {
+      const supabase = createClient()
       await supabase
         .from('promo_codes')
         .update({ used_count: promoCode.used_count + 1 })
