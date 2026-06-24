@@ -21,6 +21,8 @@ type CreateOrderInput = {
 }
 
 export async function createOrderAction(input: CreateOrderInput) {
+  console.log('🟡 createOrderAction вызван, клиент:', input.customer_name)
+
   const supabase = createClient()
 
   const { data: order, error } = await supabase
@@ -41,16 +43,17 @@ export async function createOrderAction(input: CreateOrderInput) {
     .single()
 
   if (error || !order) {
+    console.error('🔴 Ошибка insert:', error?.message)
     return { ok: false as const, error: error?.message ?? 'неизвестная ошибка' }
   }
 
-  // Письмо отправляется прямо тут, на сервере — никакого fetch из браузера,
-  // значит ни блокировщики рекламы, ни обрыв соединения при редиректе ему не помеха.
-  // Если письмо не уйдёт — заказ всё равно уже сохранён, просто пишем в лог.
+  console.log('🟢 Заказ создан:', order.id, '— отправляем письмо...')
+
   try {
     await sendOrderNotification(order)
-  } catch (err) {
-    console.error('Ошибка отправки письма о заказе:', err)
+    console.log('✅ Письмо отправлено успешно')
+  } catch (err: any) {
+    console.error('🔴 Ошибка отправки письма:', err?.message ?? err)
   }
 
   return { ok: true as const, order }
