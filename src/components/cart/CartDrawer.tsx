@@ -12,6 +12,7 @@ import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
+import { createOrderAction } from '@/app/checkout/actions'
 
 type DeliveryType = 'delivery' | 'pickup'
 type Page = 1 | 2
@@ -103,50 +104,52 @@ export function CartDrawer() {
     setPage(2)
   }
 
-  async function handleSubmit() {
-    if (!name.trim())  { toast.error('Введите имя');     return }
-    if (!phone.trim()) { toast.error('Введите телефон'); return }
-    setSubmitting(true)
+ async function handleSubmit() {
+  if (!name.trim())  { toast.error('Введите имя');     return }
+  if (!phone.trim()) { toast.error('Введите телефон'); return }
+  setSubmitting(true)
 
-    const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    let token = ANON, userId = null
-    try {
-      const raw = localStorage.getItem('sb-localhost-auth-token')
-      if (raw) { const s = JSON.parse(raw); token = s.access_token; userId = s.user?.id }
-    } catch {}
+  const orderItems = items.map(({ product, quantity }) => ({
+    product_id:     product.id,
+    name:           product.name,
+    price_at_order: calcFinalPrice(product),
+    quantity,
+    image_url:      product.image_url,
+  }))
 
-    const orderItems = items.map(({ product, quantity }) => ({
-      product_id: product.id, name: product.name,
-      price_at_order: calcFinalPrice(product), quantity, image_url: product.image_url,
-    }))
+  const result = await createOrderAction({
+    total,
+    address: deliveryType === 'delivery'
+      ? address.trim()
+      : 'Самовывоз: Шоссейная ул., 4А, д. Фёдоровское',
+    comment:        comment.trim() || null,
+    payment_method: paymentMethod,
+    promo_code_id:  promoCode?.id ?? null,
+    customer_name:  name.trim(),
+    customer_phone: phone.trim(),
+    items:          orderItems,
+  })
 
-    const payload: any = {
-      status: 'new', items: orderItems, total,
-      address: deliveryType === 'delivery' ? address.trim() : 'Самовывоз: Шоссейная ул., 4А, д. Фёдоровское',
-      comment: comment.trim() || null,
-      payment_method: paymentMethod, payment_status: 'pending',
-      promo_code_id: promoCode?.id ?? null,
-      customer_name: name.trim(), customer_phone: phone.trim(), persons,
-    }
-    if (userId) payload.user_id = userId
+  setSubmitting(false)
 
-    const res = await fetch(`${URL}/rest/v1/orders`, {
-      method: 'POST',
-      headers: { 'apikey': ANON, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-      body: JSON.stringify(payload),
-    })
-    setSubmitting(false)
-    if (!res.ok) { toast.error('Ошибка оформления заказа'); return }
-    const [order] = await res.json()
-    if (promoCode) {
-      const supabase = createClient()
-      await supabase.from('promo_codes').update({ used_count: promoCode.used_count + 1 }).eq('id', promoCode.id)
-    }
-    clearCart(); closeCart()
-    toast.success('Заказ оформлен!')
-    window.location.href = `/`
+  if (!result.ok) {
+    toast.error('Ошибка оформления: ' + result.error)
+    return
   }
+
+  if (promoCode) {
+    const supabase = createClient()
+    await supabase
+      .from('promo_codes')
+      .update({ used_count: promoCode.used_count + 1 })
+      .eq('id', promoCode.id)
+  }
+
+  clearCart()
+  closeCart()
+  toast.success('Заказ оформлен!')
+  window.location.href = '/'
+}
 
   return (
     <>
