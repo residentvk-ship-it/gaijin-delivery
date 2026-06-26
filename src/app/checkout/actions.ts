@@ -24,6 +24,8 @@ export async function createOrderAction(input: CreateOrderInput) {
   console.log('🟡 createOrderAction вызван, клиент:', input.customer_name)
 
   const supabase = createClient()
+   // Получаем текущего пользователя
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: order, error } = await supabase
     .from('orders')
@@ -38,6 +40,7 @@ export async function createOrderAction(input: CreateOrderInput) {
       promo_code_id:  input.promo_code_id,
       customer_name:  input.customer_name,
       customer_phone: input.customer_phone,
+      user_id:        user?.id ?? null,  // ← добавить 
     })
     .select()
     .single()
