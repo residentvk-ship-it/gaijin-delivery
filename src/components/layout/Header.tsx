@@ -55,40 +55,37 @@ export function Header() {
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    async function loadUser() {
-      try {
-        const raw = localStorage.getItem('sb-localhost-auth-token')
-        if (!raw) { setProfile(null); return }
-        const session = JSON.parse(raw)
-        const token   = session.access_token
-        const userId  = session.user?.id
-        const name    = session.user?.user_metadata?.name
-        if (!userId) { setProfile(null); return }
+  const supabase = createClient()
 
-        const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-        const res  = await fetch(
-          `${URL}/rest/v1/users_profiles?select=name,role&id=eq.${userId}`,
-          { headers: { apikey: ANON, Authorization: `Bearer ${token}` } }
-        )
-        const data = await res.json()
-        if (data?.[0]) {
-          setProfile({ name: data[0].name ?? name, role: data[0].role })
-        } else {
-          setProfile({ name, role: 'customer' })
-        }
-      } catch {
-        setProfile(null)
-      }
+  async function loadUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setProfile(null); return }
+
+    const { data } = await supabase
+      .from('users_profiles')
+      .select('name, role')
+      .eq('id', user.id)
+      .single()
+
+    if (data) {
+      setProfile({ name: data.name ?? user.user_metadata?.name, role: data.role })
+    } else {
+      setProfile({ name: user.user_metadata?.name ?? null, role: 'customer' })
     }
+  }
 
-    if (mounted) loadUser()
-  }, [mounted])
+  if (mounted) loadUser()
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    loadUser()
+  })
+
+  return () => subscription.unsubscribe()
+}, [mounted])
 
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    localStorage.removeItem('sb-localhost-auth-token')
     setProfile(null)
     setMenuOpen(false)
     window.location.href = '/'
