@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  console.log('🛡️ MIDDLEWARE сработал для:' request.nextUrl.pathname)
+  
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
