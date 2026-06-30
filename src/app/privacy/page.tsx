@@ -13,7 +13,7 @@ export default function PrivacyPage() {
         <h1 className="text-2xl font-bold text-text-primary mb-2">
           Политика обработки персональных данных
         </h1>
-        <p className="text-text-muted text-sm mb-8">Последнее обновление: 17 июня 2026 г.</p>
+        <p className="text-text-muted text-sm mb-8">Последнее обновление: 30 июня 2026 г.</p>
 
         <div className="space-y-8 text-text-secondary text-sm leading-relaxed">
 
@@ -25,10 +25,10 @@ export default function PrivacyPage() {
               (далее — «Оператор»).
             </p>
             <p className="mt-2">
-              Оператор: <span className="text-text-primary font-medium">[Полное наименование ИП / ООО]</span>,
-              ОГРН <span className="text-text-primary font-medium">[ОГРН]</span>,
-              ИНН <span className="text-text-primary font-medium">[ИНН]</span>,
-              адрес: <span className="text-text-primary font-medium">[Юридический адрес]</span>.
+              Оператор: <span className="text-text-primary font-medium">ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ РЕМ МАРАТ ВИКТОРОВИЧ</span>,
+              ОГРНИП <span className="text-text-primary font-medium">324784700087803</span>,
+              ИНН <span className="text-text-primary font-medium">781142227506</span>,
+              адрес: <span className="text-text-primary font-medium">Шоссейная ул., 4А, д. Фёдоровское</span>.
             </p>
             <p className="mt-2">
               Используя сайт и оформляя заказ, вы соглашаетесь с условиями настоящей Политики.
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
             <p className="mt-2">
               Для реализации своих прав обратитесь к нам по адресу:{' '}
               <a href="mailto:[email@example.com]" className="text-brand hover:underline">
-                [email@example.com]
+                zakaz.uchkuduk@mail.ru
               </a>
             </p>
           </section>
@@ -133,9 +133,9 @@ export default function PrivacyPage() {
               По всем вопросам, связанным с обработкой персональных данных, обращайтесь:
             </p>
             <ul className="mt-2 space-y-1">
-              <li>Email: <a href="mailto:[email@example.com]" className="text-brand hover:underline">[email@example.com]</a></li>
-              <li>Телефон: <span className="text-text-primary font-medium">[Номер телефона]</span></li>
-              <li>Адрес: <span className="text-text-primary font-medium">[Почтовый адрес]</span></li>
+              <li>Email: <a href="mailto:[zakaz.uchkuduk@mail.ru]" className="text-brand hover:underline">zakaz.uchkuduk@mail.ru</a></li>
+              <li>Телефон: <span className="text-text-primary font-medium">+7-812-416-35-35</span></li>
+              <li> <span className="text-text-primary font-medium"></span></li>
             </ul>
           </section>
 

@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', birthday: '', password: '', confirm: '',
   })
+  const [agreed, setAgreed] = useState(false)
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
@@ -26,6 +27,10 @@ export default function RegisterPage() {
 
     if (!form.name || !form.email || !form.phone || !form.password) {
       toast.error('Заполните все обязательные поля')
+      return
+    }
+    if (!agreed) {
+      toast.error('Нужно согласиться с политикой обработки данных')
       return
     }
     if (form.password.length < 6) {
@@ -157,15 +162,23 @@ export default function RegisterPage() {
             {passwordMatch   && <p className="text-xs text-green-600 mt-1">Пароли совпадают</p>}
           </div>
 
-          <p className="text-xs text-text-muted text-center leading-relaxed">
-            Регистрируясь, вы соглашаетесь с{' '}
-            <a href="/privacy" className="text-brand hover:underline">
-              политикой обработки персональных данных
-            </a>
-          </p>
+          <label className="flex items-start gap-2 text-xs text-text-muted leading-relaxed cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={e => setAgreed(e.target.checked)}
+              className="mt-0.5 flex-shrink-0"
+            />
+            <span>
+              Я соглашаюсь с{' '}
+              <a href="/privacy" target="_blank" className="text-brand hover:underline">
+                политикой обработки персональных данных
+              </a>
+            </span>
+          </label>
 
-          <button type="submit" disabled={loading}
-            className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading || !agreed}
+            className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50">
             {loading && <Loader2 size={16} className="animate-spin" />}
             {loading ? 'Создаю аккаунт...' : 'Зарегистрироваться'}
           </button>
