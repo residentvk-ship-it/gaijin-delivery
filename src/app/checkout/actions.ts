@@ -23,7 +23,7 @@ type CreateOrderInput = {
 export async function createOrderAction(input: CreateOrderInput) {
   console.log('🟡 createOrderAction вызван, клиент:', input.customer_name)
 
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   console.log('👤 user_id:', user?.id ?? 'NULL')   //логи
 
