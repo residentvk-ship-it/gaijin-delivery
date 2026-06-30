@@ -15,7 +15,10 @@ const nextConfig = {
   // Говорим Next.js не трогать nodemailer вебпаком — он должен
   // оставаться обычным Node.js модулем, иначе в standalone-сборке
   // он молча ломается и письма не отправляются.
-  serverExternalPackages: ['nodemailer'],
+  experimental: {
+    serverComponentsExternalPackages: ['nodemailer'],
+  },
+    
 
   images: {
     formats: ['image/webp'],
