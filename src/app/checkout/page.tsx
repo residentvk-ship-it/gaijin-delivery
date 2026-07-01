@@ -69,7 +69,7 @@ export default function CheckoutPage() {
     const orderItems = items.map(({ product, quantity, selectedToppings }) => ({
       product_id:     product.id,
       name:           product.name,
-      price_at_order: calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0 )
+      price_at_order: calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0 ),
       quantity,
       image_url:      product.image_url,
       selectedToppings,
