@@ -353,10 +353,17 @@ export default function AdminPage() {
               <div className="space-y-2 mb-4">
                 {(selected.items as OrderItemSnapshot[]).map((item, i) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-text-primary">{item.name} × {item.quantity}</span>
+                    <div className="text-text-primary">
+                      <span>{item.name} × {item.quantity}</span>
+                      {item.selectedToppings && item.selectedToppings.length > 0 && (
+                        <p className="text-xs text-text-muted mt-0.5">
+                         + {item.selectedToppings.map(t => t.name).join(', ')}
+                        </p>
+                      )}
+                    </div>
                     <span className="text-text-secondary flex-shrink-0 ml-2">
-                      {formatPrice(item.price_at_order * item.quantity)}
-                    </span>
+                     {formatPrice(item.price_at_order * item.quantity)}
+                   </span>
                   </div>
                 ))}
               </div>
