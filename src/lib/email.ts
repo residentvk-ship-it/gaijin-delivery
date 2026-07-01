@@ -2,6 +2,7 @@
 // Файл: src/lib/email.ts
 // ============================================
 import nodemailer from 'nodemailer'
+import type { Topping } from '@/types'
 
 const transporter = nodemailer.createTransport({
   host:   process.env.SMTP_HOST,
@@ -19,6 +20,7 @@ type OrderItem = {
   name: string
   quantity: number
   price_at_order: number
+  selectedToppings?: Topping[]
 }
 
 type OrderForEmail = {
@@ -34,13 +36,21 @@ type OrderForEmail = {
 
 function formatOrderHtml(order: OrderForEmail) {
   const itemsHtml = order.items
-    .map(i => `
+    .map(i => {
+      const toppingsText = i.selectedToppings?.length
+        ? `<br><span style="font-size:12px;color:#888;">+ ${i.selectedToppings.map(t => t.name).join(', ')}</span>`
+        : ''
+
+      return `
       <tr>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${i.name} × ${i.quantity}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;">
+          ${i.name} × ${i.quantity}${toppingsText}
+        </td>
         <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">
           ${(i.price_at_order * i.quantity).toLocaleString('ru-RU')} ₽
         </td>
-      </tr>`)
+      </tr>`
+    })
     .join('')
 
   return `
