@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { sendOrderNotification } from '@/lib/email'
+import type { Topping } from '@/types'
 
 type CreateOrderInput = {
   total: number
@@ -17,6 +18,7 @@ type CreateOrderInput = {
     price_at_order: number
     quantity: number
     image_url: string | null
+    selectedToppings: Topping[]
   }[]
 }
 

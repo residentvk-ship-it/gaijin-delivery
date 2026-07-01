@@ -66,12 +66,13 @@ export default function CheckoutPage() {
 
     setSubmitting(true)
 
-    const orderItems = items.map(({ product, quantity }) => ({
+    const orderItems = items.map(({ product, quantity, selectedToppings }) => ({
       product_id:     product.id,
       name:           product.name,
-      price_at_order: calcFinalPrice(product),
+      price_at_order: calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0 )
       quantity,
       image_url:      product.image_url,
+      selectedToppings,
     }))
 
     // Создание заказа + отправка письма теперь полностью на сервере (Server Action).
