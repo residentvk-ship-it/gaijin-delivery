@@ -356,7 +356,7 @@ export default function AdminPage() {
                     <div className="text-text-primary">
                       <span>{item.name} × {item.quantity}</span>
                       {item.selectedToppings && item.selectedToppings.length > 0 && (
-                        <p className="text-xs text-text-muted mt-0.5">
+                        <p className="text-sm text-black mt-0.5">
                          + {item.selectedToppings.map(t => t.name).join(', ')}
                         </p>
                       )}
