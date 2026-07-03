@@ -71,16 +71,29 @@ export function CartDrawer() {
 
   // Если пользователь залогинен и корзина открыта — подставляем адрес из его последнего заказа
   useEffect(() => {
-    if (!isOpen) return       // не делаем запрос впустую, пока корзина закрыта
-    if (address) return       // если адрес уже как-то заполнен — не перезаписываем
+  if (!isOpen) return
 
-    async function fillLastAddress() {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
+  async function fillUserData() {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
 
-      if (!session) return    // гость — ничего не делаем
+    if (!session) return // гость — ничего не делаем
 
-      const { data } = await supabase
+    // Имя и телефон — из профиля пользователя
+    if (!name || !phone) {
+      const { data: profile } = await supabase
+        .from('users_profiles')
+        .select('name, phone')
+        .eq('id', session.user.id)
+        .single()
+
+      if (profile?.name && !name)   setName(profile.name)
+      if (profile?.phone && !phone) setPhone(profile.phone)
+    }
+
+    // Адрес — из последнего заказа
+    if (!address) {
+      const { data: lastOrder } = await supabase
         .from('orders')
         .select('address')
         .eq('user_id', session.user.id)
@@ -88,12 +101,11 @@ export function CartDrawer() {
         .limit(1)
         .maybeSingle()
 
-      if (data?.address) {
-        setAddress(data.address)
-      }
+      if (lastOrder?.address) setAddress(lastOrder.address)
     }
+  }
 
-  fillLastAddress()
+  fillUserData()
 }, [isOpen])
 
   useEffect(() => { if (!isOpen) setPage(1) }, [isOpen])
