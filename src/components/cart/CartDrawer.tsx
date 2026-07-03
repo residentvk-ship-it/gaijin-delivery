@@ -69,6 +69,33 @@ export function CartDrawer() {
     return () => { document.body.style.marginRight = '0' }
   }, [isOpen])
 
+  // Если пользователь залогинен и корзина открыта — подставляем адрес из его последнего заказа
+  useEffect(() => {
+    if (!isOpen) return       // не делаем запрос впустую, пока корзина закрыта
+    if (address) return       // если адрес уже как-то заполнен — не перезаписываем
+
+    async function fillLastAddress() {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) return    // гость — ничего не делаем
+
+      const { data } = await supabase
+        .from('orders')
+        .select('address')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data?.address) {
+        setAddress(data.address)
+      }
+    }
+
+  fillLastAddress()
+}, [isOpen])
+
   useEffect(() => { if (!isOpen) setPage(1) }, [isOpen])
 
   const subtotal = totalPrice()
