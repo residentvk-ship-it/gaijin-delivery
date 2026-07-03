@@ -59,10 +59,24 @@ export function ProductModal({ product, onClose }: Props) {
   const finalPrice = basePrice + toppingsExtra
 
   function toggleTopping(t: Topping) {
-    setSelectedToppings(prev =>
-      prev.find(x => x.id === t.id) ? prev.filter(x => x.id !== t.id) : [...prev, t]
-    )
-  }
+  setSelectedToppings(prev => {
+    const alreadySelected = prev.find(x => x.id === t.id)
+
+    if (alreadySelected) {
+      // повторный клик — просто снимаем выбор
+      return prev.filter(x => x.id !== t.id)
+    }
+
+    if (t.price === 0) {
+      // выбираем бесплатный топпинг — убираем все другие бесплатные,
+      // платные не трогаем
+      return [...prev.filter(x => x.price !== 0), t]
+    }
+
+    // платный топпинг — просто добавляем, как раньше
+    return [...prev, t]
+  })
+}
 
   function handleAdd() {
     if (hasSizes && selectedSize) {
