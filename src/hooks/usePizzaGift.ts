@@ -65,7 +65,7 @@ export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct
       // Берём размеры всех пицц с учётом quantity
       const sizes = pizzaItems.flatMap(i => {
         const sizeTopping = i.selectedToppings.find(t => t.id.startsWith('size-'))
-        const sizeVal = sizeTopping ? (SIZE_VALUES[sizeTopping.name] ?? 40) : 40
+        const sizeVal = sizeTopping ? (parseInt(sizeTopping.name, 10) || 40) : 40
         return Array(i.quantity).fill(sizeVal)
       })
 
