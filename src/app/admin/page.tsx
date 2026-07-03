@@ -275,6 +275,7 @@ export default function AdminPage() {
                         <p className="text-xs text-text-muted mt-0.5 truncate">{order.address}</p>
                         <p className="text-xs text-text-muted mt-0.5">
                           {items.length} позиций · {formatDate(order.created_at)}
+                          {order.persons ? ` ·  ${order.persons}` : ''}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -373,6 +374,12 @@ export default function AdminPage() {
                   <span>Итого</span>
                   <span>{formatPrice(selected.total)}</span>
                 </div>
+                {selected.persons ? (
+                  <div className="flex justify-between text-text-secondary">
+                    <span>Персон</span>
+                    <span>{selected.persons}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between text-text-secondary">
                   <span>Оплата</span>
                   <span>{selected.payment_method === 'cash' ? 'Наличные' : 'Онлайн'}</span>

@@ -12,6 +12,7 @@ type CreateOrderInput = {
   promo_code_id: string | null
   customer_name: string
   customer_phone: string
+  persons: number
   items: {
     product_id: string
     name: string
@@ -42,6 +43,7 @@ export async function createOrderAction(input: CreateOrderInput) {
       promo_code_id:  input.promo_code_id,
       customer_name:  input.customer_name,
       customer_phone: input.customer_phone,
+      persons:        input.persons,
       user_id:        user?.id ?? null,  // ← добавить 
     })
     .select()

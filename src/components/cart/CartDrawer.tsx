@@ -167,6 +167,7 @@ export function CartDrawer() {
     promo_code_id:  promoCode?.id ?? null,
     customer_name:  name.trim(),
     customer_phone: phone.trim(),
+    persons:        persons,
     items:          orderItems,
   })
 

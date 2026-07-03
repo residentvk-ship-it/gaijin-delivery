@@ -32,6 +32,7 @@ type OrderForEmail = {
   total: number
   payment_method: 'cash' | 'card'
   comment?: string | null
+  persons?: number
 }
 
 function formatOrderHtml(order: OrderForEmail) {
@@ -58,6 +59,7 @@ function formatOrderHtml(order: OrderForEmail) {
       <h2>Новый заказ #${order.id.slice(0, 8).toUpperCase()}</h2>
       <p><b>Клиент:</b> ${order.customer_name} · ${order.customer_phone}</p>
       <p><b>Адрес:</b> ${order.address}</p>
+      ${order.persons ? `<p><b>Персон:</b> ${order.persons}</p>` : ''}
       <p><b>Оплата:</b> ${order.payment_method === 'cash' ? 'Наличные' : 'Онлайн'}</p>
       ${order.comment ? `<p><b>Комментарий:</b> ${order.comment}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;margin-top:12px;">
