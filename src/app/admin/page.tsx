@@ -385,6 +385,11 @@ export default function AdminPage() {
                   <span>{selected.payment_method === 'cash' ? 'Наличные' : 'Онлайн'}</span>
                 </div>
                 <div className="flex justify-between text-text-secondary">
+                  <span>Бонус</span>
+                  <span className="text-purple-600 font-medium">{selected.bonus_applied}</span>
+                </div>
+                )}
+                <div className="flex justify-between text-text-secondary">
                   <span>Адрес</span>
                   <span className="text-right max-w-[60%]">{selected.address}</span>
                 </div>

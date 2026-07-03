@@ -113,6 +113,12 @@ export function CartDrawer() {
   const subtotal = totalPrice()
   const { config, deliveryCost, isFreeDelivery, discount, bonusDiscount, total } =
     useCartMeta({ subtotal, deliveryType, promoCode, selectedBonus })
+    // Текстовая подпись бонуса — только для "содержательных" скидок,
+    // подарки (пицца/напиток) сюда не попадают, они и так видны в списке товаров
+  const bonusLabel =
+    selectedBonus === 'pickup'   ? `Скидка ${config.pickup_discount}% за самовывоз` :
+    selectedBonus === 'birthday' ? `Скидка ${config.birthday_discount_percent}% на день рождения` :
+    null
 
   const giftState = usePizzaGift({
     items, subtotal,
@@ -168,6 +174,7 @@ export function CartDrawer() {
     customer_name:  name.trim(),
     customer_phone: phone.trim(),
     persons:        persons,
+    bonus_applied:  bonusLabel,
     items:          orderItems,
   })
 

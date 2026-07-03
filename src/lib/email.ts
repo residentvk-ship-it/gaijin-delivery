@@ -33,6 +33,7 @@ type OrderForEmail = {
   payment_method: 'cash' | 'card'
   comment?: string | null
   persons?: number
+  bonus_applied?: string | null
 }
 
 function formatOrderHtml(order: OrderForEmail) {
@@ -60,6 +61,7 @@ function formatOrderHtml(order: OrderForEmail) {
       <p><b>Клиент:</b> ${order.customer_name} · ${order.customer_phone}</p>
       <p><b>Адрес:</b> ${order.address}</p>
       ${order.persons ? `<p><b>Персон:</b> ${order.persons}</p>` : ''}
+      ${order.bonus_applied ? `<p><b>Бонус:</b> ${order.bonus_applied}</p>` : ''}
       <p><b>Оплата:</b> ${order.payment_method === 'cash' ? 'Наличные' : 'Онлайн'}</p>
       ${order.comment ? `<p><b>Комментарий:</b> ${order.comment}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;margin-top:12px;">
