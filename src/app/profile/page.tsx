@@ -316,6 +316,7 @@ export default function ProfilePage() {
                         <div className="text-xs text-text-muted space-y-1 pt-1">
                           <p>📍 {order.address}</p>
                           <p>💳 {order.payment_method === 'cash' ? 'Наличными' : 'Картой онлайн'}</p>
+                          {order.persons && <p>👥 {order.persons} {order.persons === 1 ? 'персона' : 'персон'}</p>}
                           {order.comment && <p>💬 {order.comment}</p>}
                         </div>
 
