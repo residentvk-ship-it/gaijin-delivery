@@ -71,9 +71,9 @@ export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct
         return Array(i.quantity).fill(sizeVal)
       })
       
-      const minSize = Math.min(...sizes)
+      const maxSize = Math.max(...sizes)
       // Максимум 30 в подарок (40 не даём)
-      giftPizzaSize = minSize <= 25 ? '25' : '30'
+      giftPizzaSize = maxSize <= 25 ? '25' : '30'
     }
 
     // Проверяем есть ли уже подарочная маргарита в корзине
