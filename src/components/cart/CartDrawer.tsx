@@ -422,8 +422,8 @@ export function CartDrawer() {
                 <h3 className="font-semibold text-text-primary text-sm">Способ оплаты</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: 'cash',   label: 'Наличными', icon: Banknote,   desc: 'При получении' },
-                    { value: 'online', label: 'Картой',     icon: CreditCard, desc: 'Тинькофф' },
+                    { value: 'cash',   label: 'Наличными\Картой', icon: Banknote,   desc: 'При получении' },
+                    { value: 'online', label: 'СБП\Картой',     icon: CreditCard, desc: 'Онлайн' },
                   ] as const).map(({ value, label, icon: Icon, desc }) => (
                     <button key={value} onClick={() => setPaymentMethod(value)}
                       className={`p-3 rounded-card border-2 text-left transition-all
