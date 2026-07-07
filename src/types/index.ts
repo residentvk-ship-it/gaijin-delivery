@@ -90,6 +90,7 @@ export interface Order {
   delivery_zone_id: string | null
   payment_method: PaymentMethod
   payment_status: PaymentStatus
+  payment_id: string | null
   promo_code_id: string | null
   comment: string | null
   customer_name: string

@@ -106,10 +106,14 @@ export default function CheckoutPage() {
 
     toast.success('Заказ оформлен!')
 
-     // 1. Сначала отправляем пользователя на главную
-    router.push(`/`)
+     if (form.payment_method === 'online') {
+  // Онлайн-оплата — ведём на страницу оплаты ЮKassa
+      router.push(`/payment/${result.order.id}`)
+    } else {
+  // Наличные — как раньше, на главную
+      router.push(`/`)
+    }
 
-    // 2. Чуть-чуть придерживаем очистку корзины, чтобы не сработал лишний редирект
     setTimeout(() => {
       clearCart()
   }, 50)
