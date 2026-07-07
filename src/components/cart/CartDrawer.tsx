@@ -196,7 +196,12 @@ export function CartDrawer() {
   clearCart()
   closeCart()
   toast.success('Заказ оформлен!')
-  window.location.href = '/'
+
+  if (paymentMethod === 'online') {
+    window.location.href = `/payment/${result.order.id}`
+  } else {
+    window.location.href = '/'
+  }
 }
 
   return (
