@@ -433,7 +433,7 @@ export function CartDrawer() {
                 <div className="grid grid-cols-2 gap-2">
                   {([
                     { value: 'cash',   label: 'Наличными/Картой', icon: Banknote,   desc: 'При получении' },
-                    { value: 'online', label: 'СБП&Картой',     icon: CreditCard, desc: 'СКОРО' },
+                    { value: 'online', label: 'СБП/Картой',     icon: CreditCard, desc: 'СКОРО' },
                   ] as const).map(({ value, label, icon: Icon, desc }) => (
                     <button key={value} onClick={() => setPaymentMethod(value)}
                       className={`p-3 rounded-card border-2 text-left transition-all
