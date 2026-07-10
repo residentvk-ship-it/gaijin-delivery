@@ -150,6 +150,11 @@ export function CartDrawer() {
   }
 
  async function handleSubmit() {
+  if (paymentMethod ==='online') {
+    toast.error('Онлайн-оплата скоро заработает! Пока выберите оплату наличными или картой при получении.')
+    return
+  }
+
   if (!name.trim())  { toast.error('Введите имя');     return }
   if (!phone.trim()) { toast.error('Введите телефон'); return }
   setSubmitting(true)
@@ -427,8 +432,8 @@ export function CartDrawer() {
                 <h3 className="font-semibold text-text-primary text-sm">Способ оплаты</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: 'cash',   label: 'Наличными\Картой', icon: Banknote,   desc: 'При получении' },
-                    { value: 'online', label: 'СБП\Картой',     icon: CreditCard, desc: 'Онлайн' },
+                    { value: 'cash',   label: 'Наличными/Картой', icon: Banknote,   desc: 'При получении' },
+                    { value: 'online', label: 'СБП&Картой',     icon: CreditCard, desc: 'СКОРО' },
                   ] as const).map(({ value, label, icon: Icon, desc }) => (
                     <button key={value} onClick={() => setPaymentMethod(value)}
                       className={`p-3 rounded-card border-2 text-left transition-all
