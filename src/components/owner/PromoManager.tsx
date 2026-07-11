@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ToggleLeft, ToggleRight, Copy, Loader2, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
@@ -19,14 +20,6 @@ interface PromoCode {
   created_at: string
 }
 
-const ANON     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const h = {
-  'apikey':        ANON,
-  'Authorization': `Bearer ${ANON}`,
-  'Content-Type':  'application/json',
-}
-
 export function PromoManager() {
   const [promos,   setPromos]   = useState<PromoCode[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -36,24 +29,50 @@ export function PromoManager() {
 
   async function load() {
     setLoading(true)
-    const res  = await fetch(`${SUPA_URL}/rest/v1/promo_codes?order=created_at.desc`, { headers: h })
-    const data = await res.json()
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error(error)
+      toast.error('Не удалось загрузить промокоды')
+    }
     setPromos(Array.isArray(data) ? data : [])
     setLoading(false)
   }
 
   async function toggleActive(p: PromoCode) {
-    await fetch(`${SUPA_URL}/rest/v1/promo_codes?id=eq.${p.id}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ is_active: !p.is_active }),
-    })
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('promo_codes')
+      .update({ is_active: !p.is_active })
+      .eq('id', p.id)
+
+    if (error) {
+      console.error(error)
+      toast.error('Ошибка обновления')
+      return
+    }
+
     setPromos(prev => prev.map(x => x.id === p.id ? { ...x, is_active: !x.is_active } : x))
     toast.success(p.is_active ? 'Промокод деактивирован' : 'Промокод активирован')
   }
 
   async function deletePromo(id: string) {
     if (!confirm('Удалить промокод?')) return
-    await fetch(`${SUPA_URL}/rest/v1/promo_codes?id=eq.${id}`, { method: 'DELETE', headers: h })
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('promo_codes')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error(error)
+      toast.error('Ошибка удаления')
+      return
+    }
+
     setPromos(prev => prev.filter(x => x.id !== id))
     toast.success('Промокод удалён')
   }
@@ -109,7 +128,6 @@ export function PromoManager() {
                 <tr key={p.id}
                   className={`border-b border-surface-border last:border-0 transition-colors
                     ${!p.is_active ? 'opacity-50' : 'hover:bg-surface-section'}`}>
-                  {/* Код */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-text-primary bg-surface-section
@@ -122,7 +140,6 @@ export function PromoManager() {
                       </button>
                     </div>
                   </td>
-                  {/* Скидка */}
                   <td className="px-4 py-3">
                     <span className={`font-semibold text-sm ${p.discount_type === 'percent' ? 'text-green-600' : 'text-blue-600'}`}>
                       {p.discount_type === 'percent'
@@ -131,7 +148,6 @@ export function PromoManager() {
                       }
                     </span>
                   </td>
-                  {/* Использований */}
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span className="text-sm text-text-secondary">
                       {p.used_count}
@@ -146,7 +162,6 @@ export function PromoManager() {
                       </div>
                     )}
                   </td>
-                  {/* Истекает */}
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="text-sm text-text-secondary">
                       {p.expires_at
@@ -155,7 +170,6 @@ export function PromoManager() {
                       }
                     </span>
                   </td>
-                  {/* Действия */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => toggleActive(p)} title={p.is_active ? 'Деактивировать' : 'Активировать'}
@@ -219,13 +233,17 @@ function PromoForm({ onClose, generateCode }: {
       is_active:      form.is_active,
     }
 
-    const res = await fetch(`${SUPA_URL}/rest/v1/promo_codes`, {
-      method: 'POST', headers: h, body: JSON.stringify(payload),
-    })
+    const supabase = createClient()
+    const { error } = await supabase.from('promo_codes').insert(payload)
     setSaving(false)
 
-    if (res.ok) { toast.success('Промокод создан!'); onClose() }
-    else { const t = await res.text(); console.error(t); toast.error('Ошибка создания') }
+    if (!error) {
+      toast.success('Промокод создан!')
+      onClose()
+    } else {
+      console.error(error)
+      toast.error('Ошибка создания: ' + error.message)
+    }
   }
 
   return (
@@ -241,7 +259,6 @@ function PromoForm({ onClose, generateCode }: {
 
         <div className="p-5 space-y-4">
 
-          {/* Код */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">Код промокода</label>
             <div className="flex gap-2">
@@ -255,7 +272,6 @@ function PromoForm({ onClose, generateCode }: {
             </div>
           </div>
 
-          {/* Тип и размер скидки */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1.5">Тип скидки</label>
@@ -277,7 +293,6 @@ function PromoForm({ onClose, generateCode }: {
             </div>
           </div>
 
-          {/* Срок и лимит */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1.5">
@@ -297,7 +312,6 @@ function PromoForm({ onClose, generateCode }: {
             </div>
           </div>
 
-          {/* Активен */}
           <label className="flex items-center gap-2 cursor-pointer">
             <div onClick={() => set('is_active', !form.is_active)}
               className={`w-10 h-6 rounded-full transition-colors relative
