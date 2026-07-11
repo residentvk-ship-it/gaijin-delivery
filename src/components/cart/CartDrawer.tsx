@@ -12,7 +12,7 @@ import { GiftSelector } from '@/components/cart/GiftSelector'
 import type { PromoCode } from '@/types'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
-import { createOrderAction } from '@/app/checkout/actions'
+import { createOrderAction } from '@/app/actions'
 
 type DeliveryType = 'delivery' | 'pickup'
 type Page = 1 | 2
@@ -190,13 +190,6 @@ export function CartDrawer() {
     return
   }
 
-  if (promoCode) {
-    const supabase = createClient()
-    await supabase
-      .from('promo_codes')
-      .update({ used_count: promoCode.used_count + 1 })
-      .eq('id', promoCode.id)
-  }
 
   clearCart()
   closeCart()

@@ -1,5 +1,4 @@
 'use server'
-
 import { createClient } from '@/lib/supabase/server'
 import { sendOrderNotification } from '@/lib/email'
 import type { Topping } from '@/types'
@@ -13,7 +12,7 @@ type CreateOrderInput = {
   customer_name: string
   customer_phone: string
   persons: number
-   bonus_applied: string | null
+  bonus_applied: string | null
   items: {
     product_id: string
     name: string
@@ -26,10 +25,9 @@ type CreateOrderInput = {
 
 export async function createOrderAction(input: CreateOrderInput) {
   console.log('🟡 createOrderAction вызван, клиент:', input.customer_name)
-
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  console.log('👤 user_id:', user?.id ?? 'NULL')   //логи
+  console.log('👤 user_id:', user?.id ?? 'NULL')
 
   const { data: order, error } = await supabase
     .from('orders')
@@ -46,7 +44,7 @@ export async function createOrderAction(input: CreateOrderInput) {
       customer_phone: input.customer_phone,
       persons:        input.persons,
       bonus_applied:  input.bonus_applied,
-      user_id:        user?.id ?? null,  // ← добавить 
+      user_id:        user?.id ?? null,
     })
     .select()
     .single()
@@ -56,8 +54,18 @@ export async function createOrderAction(input: CreateOrderInput) {
     return { ok: false as const, error: error?.message ?? 'неизвестная ошибка' }
   }
 
-  console.log('🟢 Заказ создан:', order.id, '— отправляем письмо...')
+  // Увеличиваем счётчик использования промокода атомарно на сервере —
+  // клиенту больше не нужны права на запись в promo_codes
+  if (input.promo_code_id) {
+    const { error: promoError } = await supabase.rpc('increment_promo_usage', {
+      promo_id: input.promo_code_id,
+    })
+    if (promoError) {
+      console.error('🔴 Ошибка обновления промокода:', promoError.message)
+    }
+  }
 
+  console.log('🟢 Заказ создан:', order.id, '— отправляем письмо...')
   try {
     await sendOrderNotification(order)
     console.log('✅ Письмо отправлено успешно')
