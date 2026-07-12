@@ -12,6 +12,7 @@ import { Clients } from '@/components/owner/clients'
 import { History } from '@/components/owner/history'
 import type { Product, Category } from '@/types'
 import { SiteConfigManager } from '@/components/owner/SiteConfigManager'
+import Image from 'next/image'
 
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -266,7 +267,7 @@ export default function OwnerPage() {
                         <td className="px-4 py-2">
                           <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
                             {p.image_url
-                              ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                              ? <Image src={p.image_url} alt={p.name} fill sizes="48px" className="object-cover" />
                               : <div className="w-full h-full flex items-center justify-center text-xl">🍱</div>
                             }
                           </div>
