@@ -3,7 +3,7 @@ import withPWA from 'next-pwa'
 const pwaConfig = withPWA({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  skipWaiting: false,   // было true — убираем принудительный захват контроля
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [],
 })

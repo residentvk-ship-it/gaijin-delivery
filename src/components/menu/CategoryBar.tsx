@@ -39,6 +39,7 @@ export function CategoryBar({ categories, activeSlug, onSelect }: Props) {
       <div
         ref={barRef}
         className="max-w-5xl mx-auto px-4 flex gap-0 overflow-x-auto scroll-hide"
+        style={{ touchAction: 'pan-x' }}
       >
         {categories.map(cat => {
           const isActive = cat.slug === activeSlug
@@ -46,11 +47,8 @@ export function CategoryBar({ categories, activeSlug, onSelect }: Props) {
             <button
               key={cat.id}
               data-active={isActive}
-              onPointerDown={e => {
-                // Срабатывает мгновенно на первое касание/клик
-                e.preventDefault()
-                onSelect(cat.slug)
-              }}
+              type="button"
+              onClick={() => onSelect(cat.slug)}
               className={cn(
                 'flex-shrink-0 px-5 py-4 text-base font-medium transition-all border-b-2 select-none uppercase',
                 isActive
