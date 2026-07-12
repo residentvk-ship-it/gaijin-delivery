@@ -1,4 +1,4 @@
-// Горизонтальная полоска категорий: стекло, красная активная вкладка, скролл по одному клику.
+// Горизонтальная полоска категорий: стекло, красная активная вкладка, скролл по одному клику + перетаскивание мышью.
 
 'use client'
 
@@ -14,6 +14,10 @@ interface Props {
 
 export function CategoryBar({ categories, activeSlug, onSelect }: Props) {
   const barRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef  = useRef(false)
+  const movedRef       = useRef(false)
+  const startXRef      = useRef(0)
+  const startScrollRef = useRef(0)
 
   // Скроллим активную кнопку в центр полоски
   useEffect(() => {
@@ -23,44 +27,78 @@ export function CategoryBar({ categories, activeSlug, onSelect }: Props) {
     if (!active) return
     const barRect    = bar.getBoundingClientRect()
     const activeRect = active.getBoundingClientRect()
-    const scrollLeft = active.offsetLeft - barRect.width / 2 + activeRect.width / 2
+    const scrollLeft = bar.scrollLeft + (activeRect.left - barRect.left) - barRect.width / 2 + activeRect.width / 2
     bar.scrollTo({ left: scrollLeft, behavior: 'smooth' })
   }, [activeSlug])
 
+  // Перетаскивание мышью (десктоп)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const bar = barRef.current
+    if (!bar) return
+    isDraggingRef.current  = true
+    movedRef.current       = false
+    startXRef.current      = e.pageX - bar.offsetLeft
+    startScrollRef.current = bar.scrollLeft
+    bar.style.cursor = 'grabbing'
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const bar = barRef.current
+    if (!bar || !isDraggingRef.current) return
+    e.preventDefault()
+    const x    = e.pageX - bar.offsetLeft
+    const walk = x - startXRef.current
+    if (Math.abs(walk) > 5) movedRef.current = true
+    bar.scrollLeft = startScrollRef.current - walk
+  }
+
+  const stopDragging = () => {
+    const bar = barRef.current
+    isDraggingRef.current = false
+    if (bar) bar.style.cursor = 'grab'
+  }
+
   return (
-    <div
+<div
       className="sticky top-20 z-30 border-b border-white/40 shadow-sm"
       style={{
         background:           'rgba(255,255,255,0.72)',
         backdropFilter:        'blur(16px)',
         WebkitBackdropFilter:  'blur(16px)',
       }}
-    >
-      <div
+>
+<div
         ref={barRef}
         className="max-w-5xl mx-auto px-4 flex gap-0 overflow-x-auto scroll-hide"
-        style={{ touchAction: 'pan-x' }}
-      >
+        style={{ touchAction: 'pan-x', cursor: 'grab' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={stopDragging}
+        onMouseLeave={stopDragging}
+>
         {categories.map(cat => {
           const isActive = cat.slug === activeSlug
           return (
-            <button
+<button
               key={cat.id}
               data-active={isActive}
               type="button"
-              onClick={() => onSelect(cat.slug)}
+              onClick={() => {
+                if (movedRef.current) return
+                onSelect(cat.slug)
+              }}
               className={cn(
-                'flex-shrink-0 px-5 py-4 text-base font-medium transition-all border-b-2 select-none uppercase',
+'flex-shrink-0 px-5 py-4 text-base font-medium transition-all border-b-2 select-none uppercase',
                 isActive
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
               )}
-            >
+>
               {cat.name}
-            </button>
+</button>
           )
         })}
-      </div>
-    </div>
+</div>
+</div>
   )
 }
