@@ -265,7 +265,7 @@ export default function OwnerPage() {
                         )}
 
                         <td className="px-4 py-2">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-input flex-shrink-0 relative">
                             {p.image_url
                               ? <Image src={p.image_url} alt={p.name} fill sizes="48px" className="object-cover" />
                               : <div className="w-full h-full flex items-center justify-center text-xl">🍱</div>
