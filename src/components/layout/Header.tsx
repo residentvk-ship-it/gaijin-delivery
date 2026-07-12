@@ -106,7 +106,7 @@ export function Header() {
 
         {/* Логотип */}
         <a href="/" className="flex items-center flex-shrink-0">
-          <img src="/logo.png" alt="Время есть" className="h-40 w-auto" />
+          <img src="/logo.png" alt="Время есть" width={193} height={68} priority />
         </a>
 
         {/* Центр — телефон + время работы */}
