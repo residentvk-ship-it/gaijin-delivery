@@ -13,14 +13,7 @@ import { History } from '@/components/owner/history'
 import type { Product, Category } from '@/types'
 import { SiteConfigManager } from '@/components/owner/SiteConfigManager'
 import Image from 'next/image'
-
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const h = {
-  'apikey':        ANON,
-  'Authorization': `Bearer ${ANON}`,
-  'Content-Type':  'application/json',
-}
+import { createClient } from '@/lib/supabase/client'
 
 type Tab = 'products' | 'stats' | 'promos' | 'clients' | 'history' | 'config'
 
@@ -41,45 +34,50 @@ export default function OwnerPage() {
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [filterCat,   setFilterCat]   = useState<string>('all')
   const [tab,         setTab]         = useState<Tab>('products')
+  const supabase = createClient()
 
   async function load() {
     setIsLoading(true)
     const [p, c] = await Promise.all([
-      fetch(`${URL}/rest/v1/products?order=sort_order`, { headers: h }).then(r => r.json()),
-      fetch(`${URL}/rest/v1/categories?order=sort_order`, { headers: h }).then(r => r.json()),
+      supabase.from('products').select('*').order('sort_order'),
+      supabase.from('categories').select('*').order('sort_order'),
     ])
-    setProducts(p as Product[])
-    setCategories(c as Category[])
+    if (p.error) console.error('products load error:', p.error)
+    if (c.error) console.error('categories load error:', c.error)
+    setProducts((p.data as Product[]) ?? [])
+    setCategories((c.data as Category[]) ?? [])
     setIsLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
   async function toggleVisible(p: Product) {
-    await fetch(`${URL}/rest/v1/products?id=eq.${p.id}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ is_visible: !p.is_visible }),
-    })
+    const { error } = await supabase
+      .from('products')
+      .update({ is_visible: !p.is_visible })
+      .eq('id', p.id)
+    if (error) { console.error(error); return }
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, is_visible: !x.is_visible } : x))
   }
 
   async function toggleFeatured(p: Product) {
-    await fetch(`${URL}/rest/v1/products?id=eq.${p.id}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ is_featured: !p.is_featured }),
-    })
+    const { error } = await supabase
+      .from('products')
+      .update({ is_featured: !p.is_featured })
+      .eq('id', p.id)
+    if (error) { console.error(error); return }
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, is_featured: !x.is_featured } : x))
   }
 
   async function deleteProduct(id: string) {
     if (!confirm('Удалить блюдо?')) return
-    await fetch(`${URL}/rest/v1/products?id=eq.${id}`, { method: 'DELETE', headers: h })
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) { console.error(error); alert('Не удалось удалить: ' + error.message); return }
     setProducts(prev => prev.filter(x => x.id !== id))
   }
 
   // ── Сортировка стрелочками ─────────────────────────────────────────────────
   async function moveProduct(productId: string, direction: 'up' | 'down') {
-    // Берём только блюда текущей категории в текущем порядке
     const catProducts = products.filter(p => p.category_id === filterCat)
     const idx = catProducts.findIndex(p => p.id === productId)
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
@@ -89,21 +87,21 @@ export default function OwnerPage() {
     const a = catProducts[idx]
     const b = catProducts[swapIdx]
 
-    // Меняем sort_order местами
     const aOrder = a.sort_order ?? idx
     const bOrder = b.sort_order ?? swapIdx
 
-    // Сохраняем в базу
-    await Promise.all([
-      fetch(`${URL}/rest/v1/products?id=eq.${a.id}`, {
-        method: 'PATCH', headers: h,
-        body: JSON.stringify({ sort_order: bOrder }),
-      }),
-      fetch(`${URL}/rest/v1/products?id=eq.${b.id}`, {
-        method: 'PATCH', headers: h,
-        body: JSON.stringify({ sort_order: aOrder }),
-      }),
+    const [resA, resB] = await Promise.all([
+      supabase.from('products').update({ sort_order: bOrder }).eq('id', a.id),
+      supabase.from('products').update({ sort_order: aOrder }).eq('id', b.id),
     ])
+    if (resA.error || resB.error) { console.error(resA.error, resB.error); return }
+
+    setProducts(prev => prev.map(p => {
+      if (p.id === a.id) return { ...p, sort_order: bOrder }
+      if (p.id === b.id) return { ...p, sort_order: aOrder }
+      return p
+    }).sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0)))
+  }
 
     // Обновляем локально
     setProducts(prev => prev.map(p => {
