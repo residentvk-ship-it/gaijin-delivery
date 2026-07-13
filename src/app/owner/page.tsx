@@ -96,13 +96,6 @@ export default function OwnerPage() {
     ])
     if (resA.error || resB.error) { console.error(resA.error, resB.error); return }
 
-    setProducts(prev => prev.map(p => {
-      if (p.id === a.id) return { ...p, sort_order: bOrder }
-      if (p.id === b.id) return { ...p, sort_order: aOrder }
-      return p
-    }).sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0)))
-  }
-
     // Обновляем локально
     setProducts(prev => prev.map(p => {
       if (p.id === a.id) return { ...p, sort_order: bOrder }
