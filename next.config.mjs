@@ -28,11 +28,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'api.u4kuduk.ru',
+        hostname: 'api.4163535.ru',
       },
       {
         protocol: 'https',
-        hostname: 'u4kuduk.ru',
+        hostname: '4163535.ru',
       },
     ],
   },
