@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { TrendingUp, ShoppingBag, Users, Clock, Star } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils'
 
 interface OrderItem {
@@ -40,15 +41,6 @@ interface ProductStat {
   revenue: number
 }
 
-const ANON     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-
-const h = {
-  'apikey':        ANON,
-  'Authorization': `Bearer ${ANON}`,
-  'Content-Type':  'application/json',
-}
-
 type Period = 'today' | 'week' | 'month' | 'all' | 'custom'
 
 function StarRow({ rating }: { rating: number }) {
@@ -70,16 +62,23 @@ export function StatsPanel() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
 
+  const supabase = createClient()
+
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
+
     const [ordersRes, reviewsRes] = await Promise.all([
-      fetch(`${SUPA_URL}/rest/v1/orders?order=created_at.desc&limit=500`, { headers: h }).then(r => r.json()),
-      fetch(`${SUPA_URL}/rest/v1/order_reviews?select=id,order_id,rating,text,created_at&order=created_at.desc`, { headers: h }).then(r => r.json()),
+      supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('order_reviews').select('id,order_id,rating,text,created_at').order('created_at', { ascending: false }),
     ])
-    setOrders(Array.isArray(ordersRes) ? ordersRes : [])
-    setReviews(Array.isArray(reviewsRes) ? reviewsRes : [])
+
+    if (ordersRes.error)  console.error('orders load error:', ordersRes.error)
+    if (reviewsRes.error) console.error('reviews load error:', reviewsRes.error)
+
+    setOrders(ordersRes.data ?? [])
+    setReviews(reviewsRes.data ?? [])
     setLoading(false)
   }
 
@@ -107,7 +106,6 @@ export function StatsPanel() {
   const revenue    = completed.reduce((s, o) => s + o.total, 0)
   const avgOrder   = completed.length ? Math.round(revenue / completed.length) : 0
 
-  // Отзывы за период
   const filteredReviews = filterByPeriod(reviews)
   const avgRating = filteredReviews.length
     ? Math.round((filteredReviews.reduce((s, r) => s + r.rating, 0) / filteredReviews.length) * 10) / 10
@@ -117,7 +115,6 @@ export function StatsPanel() {
     count: filteredReviews.filter(r => r.rating === star).length,
   }))
 
-  // Статистика по дням
   const dayStats: DayStat[] = []
   const days = period === 'today' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 0
   if (period !== 'all' && period !== 'custom') {
@@ -134,7 +131,6 @@ export function StatsPanel() {
     }
   }
 
-  // Топ блюд
   const productMap: Record<string, ProductStat> = {}
   completed.forEach(o => {
     o.items.forEach(item => {
@@ -157,7 +153,6 @@ export function StatsPanel() {
   return (
     <div className="space-y-6">
 
-      {/* Переключатель периода */}
       <div>
         <div className="flex flex-wrap gap-2">
           {([
@@ -185,7 +180,6 @@ export function StatsPanel() {
         )}
       </div>
 
-      {/* Карточки метрик */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Выручка',     value: formatPrice(revenue),    icon: TrendingUp,  color: 'text-green-600',   bg: 'bg-green-50'  },
@@ -203,7 +197,6 @@ export function StatsPanel() {
         ))}
       </div>
 
-      {/* График выручки */}
       {dayStats.length > 1 && (
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">Выручка по дням</h3>
@@ -230,7 +223,6 @@ export function StatsPanel() {
         </div>
       )}
 
-      {/* Топ блюд + последние заказы */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">🏆 Топ блюд</h3>
@@ -288,7 +280,6 @@ export function StatsPanel() {
         </div>
       </div>
 
-      {/* Отзывы */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">⭐ Рейтинг отзывов</h3>
@@ -296,7 +287,6 @@ export function StatsPanel() {
             <p className="text-text-muted text-sm text-center py-4">Отзывов пока нет</p>
           ) : (
             <div className="space-y-4">
-              {/* Средний балл */}
               <div className="flex items-center gap-4">
                 <p className="text-5xl font-bold text-text-primary">{avgRating}</p>
                 <div>
@@ -304,7 +294,6 @@ export function StatsPanel() {
                   <p className="text-xs text-text-muted mt-1">{filteredReviews.length} отзывов</p>
                 </div>
               </div>
-              {/* Распределение */}
               <div className="space-y-1.5">
                 {ratingDist.map(({ star, count }) => (
                   <div key={star} className="flex items-center gap-2">
@@ -324,7 +313,6 @@ export function StatsPanel() {
           )}
         </div>
 
-        {/* Последние отзывы */}
         <div className="bg-white rounded-card shadow-card p-5">
           <h3 className="font-semibold text-text-primary mb-4">💬 Последние отзывы</h3>
           {filteredReviews.length === 0 ? (
@@ -347,7 +335,6 @@ export function StatsPanel() {
         </div>
       </div>
 
-      {/* Сводка */}
       <div className="bg-white rounded-card shadow-card p-5">
         <h3 className="font-semibold text-text-primary mb-3">Сводка за период</h3>
         <div className="grid grid-cols-3 gap-4 text-center">

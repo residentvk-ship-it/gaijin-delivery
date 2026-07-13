@@ -2,15 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Star } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
-
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const h = {
-  'apikey':        ANON,
-  'Authorization': `Bearer ${ANON}`,
-  'Content-Type':  'application/json',
-}
 
 type OrderItem = {
   name: string
@@ -75,27 +68,31 @@ export function History() {
   const [expanded,  setExpanded]  = useState<string | null>(null)
   const [reviews,   setReviews]   = useState<Record<string, Review | null>>({})
 
+  const supabase = createClient()
+
   useEffect(() => {
     async function load() {
       setIsLoading(true)
+
       const [ordersRes, profilesRes, reviewsRes] = await Promise.all([
-        fetch(`${URL}/rest/v1/orders?select=*&order=created_at.desc`, { headers: h }).then(r => r.json()),
-        fetch(`${URL}/rest/v1/users_profiles?select=id,name,phone`, { headers: h }).then(r => r.json()),
-        fetch(`${URL}/rest/v1/order_reviews?select=order_id,rating,text,photo_url,id`, { headers: h }).then(r => r.json()),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('users_profiles').select('id,name,phone'),
+        supabase.from('order_reviews').select('order_id,rating,text,photo_url,id'),
       ])
 
+      if (ordersRes.error)   console.error('orders load error:', ordersRes.error)
+      if (profilesRes.error) console.error('profiles load error:', profilesRes.error)
+      if (reviewsRes.error)  console.error('reviews load error:', reviewsRes.error)
+
       const profileMap = new Map<string, UserProfile>(
-        (Array.isArray(profilesRes) ? profilesRes : []).map((p: any) => [p.id, p])
+        (profilesRes.data ?? []).map((p: any) => [p.id, p])
       )
 
-      // Все отзывы сразу в map
       const reviewMap: Record<string, Review | null> = {}
-      if (Array.isArray(reviewsRes)) {
-        reviewsRes.forEach((r: any) => { reviewMap[r.order_id] = r })
-      }
+      ;(reviewsRes.data ?? []).forEach((r: any) => { reviewMap[r.order_id] = r })
       setReviews(reviewMap)
 
-      const merged = (Array.isArray(ordersRes) ? ordersRes as Order[] : []).map(o => ({
+      const merged = ((ordersRes.data as Order[]) ?? []).map(o => ({
         ...o,
         users_profiles: o.user_id ? (profileMap.get(o.user_id) ?? null) : null,
       }))
@@ -106,10 +103,8 @@ export function History() {
   }, [])
 
   async function updateStatus(id: string, status: string) {
-    await fetch(`${URL}/rest/v1/orders?id=eq.${id}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ status }),
-    })
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id)
+    if (error) { console.error(error); return }
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
   }
 
@@ -168,7 +163,6 @@ export function History() {
                 {PAYMENT_LABEL[o.payment_method] ?? o.payment_method}
               </span>
 
-              {/* Звёзды отзыва в строке — сразу видно */}
               {review && (
                 <div className="flex-shrink-0">
                   <StarRow rating={review.rating} size={12} />
@@ -205,7 +199,6 @@ export function History() {
                   <p className="text-xs text-green-600 font-medium">⏱ {o.delivery_note}</p>
                 )}
 
-                {/* Полный отзыв по клику */}
                 <div className="pt-2 border-t border-surface-border">
                   <p className="text-xs text-text-muted font-medium mb-1.5">Отзыв клиента</p>
                   {!review ? (
@@ -222,7 +215,6 @@ export function History() {
                   )}
                 </div>
 
-                {/* Смена статуса — только для незавершённых */}
                 {!isDone && (
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
                     <span className="text-xs text-text-muted">Статус:</span>
