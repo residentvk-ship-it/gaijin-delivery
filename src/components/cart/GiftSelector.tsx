@@ -66,17 +66,17 @@ export function GiftSelector({
   }, [hasAnyGift])
 
   function removeGiftFromCart() {
-    const giftPizza = items.find(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
+    const giftPizza = items.find(i => i.product.id === MARGHERITA_ID && i.isGift)
     if (giftPizza) removeItem(giftPizza.cartKey)
     DRINK_GIFTS.forEach(g => {
-      const giftDrink = items.find(i => i.product.id === g.id && i.product.price === 0)
+      const giftDrink = items.find(i => i.product.id === g.id && i.isGift)
       if (giftDrink) removeItem(giftDrink.cartKey)
     })
   }
 
   function isGiftAlreadyInCart(choice: GiftChoice): boolean {
-    if (choice === 'pizza') return items.some(i => i.product.id === MARGHERITA_ID && i.product.price === 0)
-    return items.some(i => i.product.id === choice && i.product.price === 0)
+    if (choice === 'pizza') return items.some(i => i.product.id === MARGHERITA_ID && i.isGift)
+    return items.some(i => i.product.id === choice && i.isGift)
   }
 
   function selectGiftItem(newChoice: GiftChoice) {
@@ -89,11 +89,11 @@ export function GiftSelector({
     if (newChoice === 'pizza' && giftPizzaSize) {
       const sz = MARGHERITA_SIZES[giftPizzaSize]
       if (!sz) return
-      addItem({ ...margherita, price: 0, final_price: 0 }, [{ id: `size-${sz.id}`, name: sz.name, price: 0 }])
+      addItem({ ...margherita, price: 0, final_price: 0 }, [{ id: `size-${sz.id}`, name: sz.name, price: 0 }], true)
     } else {
       const drink = drinks.find(d => d.id === newChoice)
       if (!drink) return
-      addItem({ ...drink, price: 0, final_price: 0 }, [])
+      addItem({ ...drink, price: 0, final_price: 0 }, [], true)
     }
   }
 

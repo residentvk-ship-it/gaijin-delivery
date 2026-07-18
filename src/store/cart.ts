@@ -5,10 +5,11 @@ import { persist } from 'zustand/middleware'
 import type { Product, CartItem, Topping } from '@/types'
 import { calcFinalPrice } from '@/lib/utils'
 
-// Уникальный ключ позиции = productId + отсортированные id топпингов
-function makeCartKey(productId: string, toppings: Topping[]): string {
+// Уникальный ключ позиции = productId + отсортированные id топпингов (+ метка подарка)
+function makeCartKey(productId: string, toppings: Topping[], isGift = false): string {
   const toppingPart = toppings.map(t => t.id).sort().join(',')
-  return toppingPart ? `${productId}::${toppingPart}` : productId
+  const base = toppingPart ? `${productId}::${toppingPart}` : productId
+  return isGift ? `${base}::gift` : base
 }
 
 // Доплата за выбранные топпинги
@@ -20,7 +21,7 @@ interface CartStore {
   items: CartItem[]
   isOpen: boolean
 
-  addItem: (product: Product, selectedToppings?: Topping[]) => void
+  addItem: (product: Product, selectedToppings?: Topping[], isGift?: boolean) => void
   removeItem: (cartKey: string) => void
   updateQuantity: (cartKey: string, quantity: number) => void
   clearCart: () => void
@@ -37,8 +38,8 @@ export const useCartStore = create<CartStore>()(
       items: [],
       isOpen: false,
 
-      addItem: (product, selectedToppings = []) => {
-        const cartKey = makeCartKey(product.id, selectedToppings)
+      addItem: (product, selectedToppings = [], isGift = false) => {
+        const cartKey = makeCartKey(product.id, selectedToppings, isGift)
         set(state => {
           const existing = state.items.find(i => i.cartKey === cartKey)
           if (existing) {
@@ -49,7 +50,7 @@ export const useCartStore = create<CartStore>()(
             }
           }
           return {
-            items: [...state.items, { product, quantity: 1, selectedToppings, cartKey }]
+            items: [...state.items, { product, quantity: 1, selectedToppings, cartKey, isGift }]
           }
         })
       },

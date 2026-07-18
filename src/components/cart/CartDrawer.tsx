@@ -266,9 +266,8 @@ export function CartDrawer() {
               <>
                 {/* Список */}
                 <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-                  {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => {
+                  {items.map(({ product, quantity, cartKey, selectedToppings = [], isGift }) => {
                     const price  = calcFinalPrice(product) + selectedToppings.reduce((s, t) => s + t.price, 0)
-                    const isGift = product.price === 0
                     return (
                       <div key={cartKey} className="flex gap-3 items-start">
                         <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-input flex-shrink-0">
@@ -441,12 +440,12 @@ export function CartDrawer() {
 
               <div className="bg-surface-section rounded-card p-4 space-y-1.5">
                 <p className="font-semibold text-text-primary text-sm mb-2">Ваш заказ</p>
-                {items.map(({ product, quantity, cartKey, selectedToppings = [] }) => (
+                {items.map(({ product, quantity, cartKey, selectedToppings = [], isGift }) => (
                   <div key={cartKey} className="space-y-0.5">
                     <div className="flex justify-between text-sm">
                       <span className="text-text-secondary line-clamp-1 flex-1">{product.name} × {quantity}</span>
                       <span className="text-text-primary font-medium ml-2 flex-shrink-0">
-                        {product.price === 0 ? '0 ₽' : formatPrice(calcFinalPrice(product) * quantity)}
+                        {isGift ? '0 ₽' : formatPrice(calcFinalPrice(product) * quantity)}
                       </span>
                     </div>
                     {selectedToppings.length > 0 && (

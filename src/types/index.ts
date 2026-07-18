@@ -56,6 +56,7 @@ export interface CartItem {
   quantity: number
   selectedToppings: Topping[]
   cartKey: string
+  isGift?: boolean
 }
 
 // ─── Заказы ───────────────────────────────────────────────────────────────────
