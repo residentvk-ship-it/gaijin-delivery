@@ -24,6 +24,9 @@ export async function middleware(request: NextRequest) {
           )
         },
       },
+      cookieOptions: {
+        domain: '.4163535.ru',
+     },
     }
   )
 

@@ -20,6 +20,9 @@ export async function createClient() {
           } catch {}
         },
       },
+      cookieOptions: {
+        domain: '.4163535.ru',
+      },
     }
   )
 }
@@ -42,6 +45,9 @@ export async function createAdminClient() {
             )
           } catch {}
         },
+      },
+      cookieOptions: {
+        domain: '.4163535.ru',
       },
     }
   )
