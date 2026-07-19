@@ -10,9 +10,10 @@ import type { Product, ProductSize } from '@/types'
 interface Props {
   product: Product
   onClick: () => void
+  compact?: boolean
 }
 
-export function ProductCard({ product, onClick }: Props) {
+export function ProductCard({ product, onClick, compact = false }: Props) {
   const { items, addItem, updateQuantity } = useCartStore()
   const [frosted,  setFrosted]  = useState(false)
   const [revealed, setRevealed] = useState(false)
@@ -109,7 +110,12 @@ export function ProductCard({ product, onClick }: Props) {
 
       {/* Инфо */}
       <div className="flex flex-col flex-1 p-3 gap-1">
-        <h3 className="text-text-primary font-medium text-sm leading-snug line-clamp-2">
+        <h3
+          className={cn(
+            'text-text-primary font-medium leading-snug line-clamp-2',
+            compact ? 'text-xs sm:text-sm' : 'text-sm'
+          )}
+        >
           {product.name}
         </h3>
 
