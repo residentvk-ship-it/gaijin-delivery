@@ -113,7 +113,7 @@ export default function HomePage() {
                   </h2>
                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                     {featured.map(p => (
-                      <ProductCard key={p.id} product={p} onClick={() => setSelectedProduct(p)} />
+                      <ProductCard key={p.id} product={p} onClick={() => setSelectedProduct(p)} compact />
                     ))}
                   </div>
                 </section>
