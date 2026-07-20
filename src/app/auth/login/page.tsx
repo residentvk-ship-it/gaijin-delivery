@@ -29,16 +29,19 @@ export default function LoginPage() {
     }
 
     setLoading(true)
-    const supabase = createClient()
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email:    form.email.trim(),
-      password: form.password,
+    
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email:    form.email.trim(),
+        password: form.password,
+      }),
     })
 
     setLoading(false)
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Неверный email или пароль')
       return
     }
