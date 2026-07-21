@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sendOrderNotification } from '@/lib/email'
 
 const SHOP_ID    = process.env.YOOKASSA_SHOP_ID!
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY!
@@ -36,11 +37,22 @@ export async function POST(req: NextRequest) {
   const supabase = await createAdminClient()
 
   if (payment.status === 'succeeded') {
-    await supabase
+    const { data: updatedOrder } = await supabase
       .from('orders')
       .update({ payment_status: 'paid', status: 'delivering' })
       .eq('id', orderId)
       .eq('payment_id', paymentId)
+      .select()
+      .single()
+    // Письмо шлём только если строка реально обновилась —
+    // иначе можем задублировать письмо, если ЮKassa пришлёт вебхук повторно
+    if (updatedOrder) {
+      try {
+        await sendOrderNotification(updatedOrder)
+      } catch (err: any) {
+        console.error('Ошибка отправки письма после оплаты:', err?.message ?? err)
+      }
+    }
   }
 
   if (payment.status === 'canceled') {

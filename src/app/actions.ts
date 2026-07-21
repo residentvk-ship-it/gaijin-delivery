@@ -65,12 +65,16 @@ export async function createOrderAction(input: CreateOrderInput) {
     }
   }
 
-  console.log('🟢 Заказ создан:', order.id, '— отправляем письмо...')
-  try {
-    await sendOrderNotification(order)
-    console.log('✅ Письмо отправлено успешно')
-  } catch (err: any) {
-    console.error('🔴 Ошибка отправки письма:', err?.message ?? err)
+  if (input.payment_method === 'cash') {
+    console.log('🟢 Заказ создан:', order.id, '— отправляем письмо...')
+    try {
+      await sendOrderNotification(order)
+      console.log('✅ Письмо отправлено успешно')
+    } catch (err: any) {
+      console.error('🔴 Ошибка отправки письма:', err?.message ?? err)
+    }
+  } else {
+    console.log('🟡 Заказ создан:', order.id, '— ждём оплаты, письмо отправится после подтверждения')
   }
 
   return { ok: true as const, order }
