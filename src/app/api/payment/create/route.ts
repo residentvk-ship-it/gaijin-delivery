@@ -66,19 +66,19 @@ export async function POST(req: NextRequest) {
         customer: {
           phone: sanitizePhone(order.customer_phone),
         },
-        items: order.items
-          .filter((item: any) => item.price_at_order > 0)
-          .map((item: any) => ({
-            description: item.name.slice(0, 128),
-            quantity: item.quantity.toString(),
+        items: [
+          {
+            description: `Заказ #${order.id.slice(0, 8).toUpperCase()}`,
+            quantity: '1',
             amount: {
-              value: (item.price_at_order * item.quantity).toFixed(2),
+              value: order.total.toFixed(2),
               currency: 'RUB',
             },
-          vat_code: 1,
-          payment_mode: 'full_payment',
-          payment_subject: 'commodity',
-        })),
+            vat_code: 1,
+            payment_mode: 'full_payment',
+            payment_subject: 'commodity',
+          },
+        ],
       },
     }),
   })
