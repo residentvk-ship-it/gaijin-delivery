@@ -49,6 +49,16 @@ const DELIVERY_OPTIONS = [
 // не возвращался, данные всё равно не "протухнут" больше, чем на этот интервал.
 const POLL_INTERVAL_MS = 20000
 
+// Неоплаченный онлайн-заказ админу не показываем — это просто "человек начал
+// оформлять, но не факт что заплатит". Как только придёт вебхук с payment_status
+// 'paid', заказ появится в списке сам.
+function isVisibleToAdmin(order: Order): boolean {
+  if (order.payment_method === 'online' && order.payment_status !== 'paid') {
+    return false
+    }
+    return true
+  }
+
 export default function AdminPage() {
   const [orders,         setOrders]         = useState<Order[]>([])
   const [loading,        setLoading]        = useState(true)
@@ -66,7 +76,7 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100)
-    if (data) setOrders(data as Order[])
+    if (data) setOrders((data as Order[]).filter(isVisibleToAdmin))
     setLoading(false)
   }
 
@@ -80,12 +90,35 @@ export default function AdminPage() {
         .channel('admin-orders')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
           if (payload.eventType === 'INSERT') {
-            setOrders(prev => [payload.new as Order, ...prev])
-            toast('🆕 Новый заказ!', { duration: 6000, icon: '🔔' })
+            const newOrder = payload.new as Order
+            if (isVisibleToAdmin(newOrder)) {
+              setOrders(prev => [newOrder, ...prev])
+              toast('🆕 Новый заказ!', { duration: 6000, icon: '🔔' })
+            }
+            // Неоплаченный онлайн-заказ — молча игнорируем, покажем его,
+            // когда придёт апдейт с payment_status: 'paid'
           }
           if (payload.eventType === 'UPDATE') {
             const updated = payload.new as Order
-            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o))
+
+            setOrders(prev => {
+              const alreadyShown = prev.some(o => o.id === updated.id)
+
+              if (!isVisibleToAdmin(updated)) {
+                // Заказ стал невидимым (например, оплата провалилась) — убираем, если был в списке
+                return prev.filter(o => o.id !== updated.id)
+              }
+
+              if (!alreadyShown) {
+                // Заказ только что стал видимым — онлайн-оплата только что подтвердилась
+                toast('🆕 Новый заказ (оплачен)!', { duration: 6000, icon: '🔔' })
+                return [updated, ...prev]
+              }
+
+              // Уже был в списке — просто обновляем данные
+              return prev.map(o => o.id === updated.id ? updated : o)
+            })
+
             setSelected(prev => prev?.id === updated.id ? updated : prev)
           }
         })

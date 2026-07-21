@@ -5,6 +5,16 @@ import { randomUUID } from 'crypto'
 const SHOP_ID    = process.env.YOOKASSA_SHOP_ID!
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY!
 const APP_URL    = process.env.NEXT_PUBLIC_APP_URL!
+// ЮKassa требует телефон в чеке только цифрами, без +, скобок, дефисов и пробелов.
+// Если после этого номер начинается с 8 (частый способ ввода в России) — меняем на 7.
+function sanitizePhone(raw: string): string {
+  let digits = raw.replace(/\D/g, '')
+  if (digits.startsWith('8') && digits.length === 11) {
+    digits = '7' + digits.slice(1)
+  }
+  return digits
+}
+
 
 export async function POST(req: NextRequest) {
   const { orderId } = await req.json()
@@ -54,7 +64,7 @@ export async function POST(req: NextRequest) {
       },
       receipt: {
         customer: {
-          phone: order.customer_phone,
+          phone: sanitizePhone(order.customer_phone),
         },
         items: order.items.map((item: any) => ({
           description: item.name.slice(0, 128),
