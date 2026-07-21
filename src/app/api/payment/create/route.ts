@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
             description: item.name.slice(0, 128),
             quantity: item.quantity.toString(),
             amount: {
-              value: item.price_at_order.toFixed(2),
+              value: (item.price_at_order * item.quantity).toFixed(2),
               currency: 'RUB',
             },
           vat_code: 1,
