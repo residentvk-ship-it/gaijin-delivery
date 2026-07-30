@@ -150,10 +150,11 @@ export function CartDrawer() {
   }
 
  async function handleSubmit() {
-  //if (paymentMethod ==='online') {
-    //toast.error('Онлайн-оплата скоро заработает! Пока выберите оплату наличными или картой при получении.')
-    //return
-  //}
+    // Проверяем метод оплаты и мобильное устройство через User-Agent (без импортов)
+  if (paymentMethod ==='online' && /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+    toast.error('Онлайн-оплата на мобильном скоро заработает! Пока выберите оплату наличными или картой при получении.')
+    return
+  }
 
   if (!name.trim())  { toast.error('Введите имя');     return }
   if (!phone.trim()) { toast.error('Введите телефон'); return }
