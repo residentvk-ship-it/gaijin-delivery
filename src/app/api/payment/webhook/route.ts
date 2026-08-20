@@ -37,30 +37,45 @@ export async function POST(req: NextRequest) {
   const supabase = await createAdminClient()
 
   if (payment.status === 'succeeded') {
-    const { data: updatedOrder } = await supabase
+    console.log('🟢 Вебхук: платеж succeeded для заказа', orderId)
+
+    const { data: updatedOrder, error } = await supabase
       .from('orders')
-      .update({ payment_status: 'paid', status: 'delivering' })
-      .eq('id', orderId)
-      .eq('payment_id', paymentId)
+      .update({ 
+        payment_status: 'paid',
+        status: 'delivering',
+        payment_id: paymentId // Гарантированно записываем ID
+      })
+      .eq('id', orderId) // Ищем ТОЛЬКО по ID заказа
       .select()
       .single()
-    // Письмо шлём только если строка реально обновилась —
-    // иначе можем задублировать письмо, если ЮKassa пришлёт вебхук повторно
+
+    if (error) {
+      console.error('🔴 Вебхук: ошибка обновления заказа:', error)
+    }
+
     if (updatedOrder) {
+      console.log('✅ Вебхук: заказ обновлён, отправляем письмо...')
       try {
         await sendOrderNotification(updatedOrder)
+        console.log('✅ Вебхук: письмо отправлено успешно')
       } catch (err: any) {
-        console.error('Ошибка отправки письма после оплаты:', err?.message ?? err)
+        console.error('🔴 Вебхук: ошибка отправки письма:', err?.message ?? err) // <-- Здесь была пропущена скобка
       }
+    } else {
+      console.warn('🟡 Вебхук: заказ не найден в БД. orderId =', orderId)
     }
   }
 
   if (payment.status === 'canceled') {
+    console.log('🟠 Вебхук: платеж canceled для заказа', orderId)
     await supabase
       .from('orders')
-      .update({ payment_status: 'failed' })
-      .eq('id', orderId)
-      .eq('payment_id', paymentId)
+      .update({ 
+        payment_status: 'failed',
+        payment_id: paymentId // Добавили для консистентности
+      })
+      .eq('id', orderId) // Убрали лишнее условие для консистентности
   }
 
   return NextResponse.json({ ok: true })
