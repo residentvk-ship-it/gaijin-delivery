@@ -62,7 +62,7 @@ function formatOrderHtml(order: OrderForEmail) {
       <p><b>Адрес:</b> ${order.address}</p>
       ${order.persons ? `<p><b>Персон:</b> ${order.persons}</p>` : ''}
       ${order.bonus_applied ? `<p><b>Бонус:</b> ${order.bonus_applied}</p>` : ''}
-      <p><b>Оплата:</b> ${order.payment_method === 'cash' ? 'Наличные' : 'Онлайн'}</p>
+      <p><b>Оплата:</b> ${order.payment_method === 'cash' ? 'ПРИ ПОЛУЧЕНИИ Наличные или карта' : 'ОПЛАЧЕНО ЮКАССА'}</p>
       ${order.comment ? `<p><b>Комментарий:</b> ${order.comment}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;margin-top:12px;">
         ${itemsHtml}
