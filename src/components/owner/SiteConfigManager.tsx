@@ -4,11 +4,19 @@
 
 import { useEffect, useState } from 'react'
 import { Save, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { BannerManager } from '@/components/owner/BannerManager'
 import toast from 'react-hot-toast'
 
 type Row = { key: string; value: string }
+
+const ANON     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+
+const h = {
+  'apikey':        ANON,
+  'Authorization': `Bearer ${ANON}`,
+  'Content-Type':  'application/json',
+}
 
 // Описание полей — что показывать в форме
 const FIELDS: {
@@ -51,14 +59,17 @@ export function SiteConfigManager() {
 
   useEffect(() => {
     async function loadConfig() {
-      const supabase = createClient()
-
-      // Загружаем настройки
-      const { data, error } = await supabase.from('site_config').select('*')
-      if (error || !data) { toast.error('Не удалось загрузить настройки'); setLoading(false); return }
-      const map: Record<string, string> = {}
-      for (const row of data as Row[]) map[row.key] = row.value
-      setValues(map)
+      // Загружаем настройки через REST API с авторизацией
+      try {
+        const res = await fetch(`${SUPA_URL}/rest/v1/site_config?select=*`, { headers: h })
+        const data = await res.json()
+        if (!Array.isArray(data)) { toast.error('Не удалось загрузить настройки'); setLoading(false); return }
+        const map: Record<string, string> = {}
+        for (const row of data as Row[]) map[row.key] = row.value
+        setValues(map)
+      } catch {
+        toast.error('Не удалось загрузить настройки')
+      }
       setLoading(false)
     }
     loadConfig()
@@ -70,11 +81,25 @@ export function SiteConfigManager() {
 
   async function save() {
     setSaving(true)
-    const supabase = createClient()
     const rows: Row[] = Object.entries(values).map(([key, value]) => ({ key, value }))
-    const { error } = await supabase.from('site_config').upsert(rows, { onConflict: 'key' })
+
+    // Сохраняем через REST API с авторизацией (аналогично BannerManager)
+    const promises = rows.map(row =>
+      fetch(`${SUPA_URL}/rest/v1/site_config?key=eq.${row.key}`, {
+        method: 'PATCH',
+        headers: h,
+        body: JSON.stringify({ value: row.value }),
+      })
+    )
+
+    const results = await Promise.all(promises)
     setSaving(false)
-    if (error) { toast.error('Ошибка сохранения'); return }
+
+    if (results.some(r => !r.ok)) {
+      toast.error('Ошибка сохранения')
+      return
+    }
+
     toast.success('Настройки сохранены!')
   }
 
