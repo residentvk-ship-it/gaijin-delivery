@@ -48,10 +48,34 @@ export function SiteConfigManager() {
   const [values,  setValues]  = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
 
   useEffect(() => {
-    async function load() {
+    async function checkAuth() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error('Требуется авторизация')
+        setLoading(false)
+        return
+      }
+
+      // Проверяем роль владельца через таблицу profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role !== 'owner') {
+        toast.error('Доступ запрещён: требуются права владельца')
+        setLoading(false)
+        return
+      }
+
+      setIsOwner(true)
+
+      // Загружаем настройки
       const { data, error } = await supabase.from('site_config').select('*')
       if (error || !data) { toast.error('Не удалось загрузить настройки'); setLoading(false); return }
       const map: Record<string, string> = {}
@@ -59,7 +83,7 @@ export function SiteConfigManager() {
       setValues(map)
       setLoading(false)
     }
-    load()
+    checkAuth()
   }, [])
 
   function set(key: string, value: string) {
@@ -82,6 +106,10 @@ export function SiteConfigManager() {
         <Loader2 size={28} className="animate-spin text-brand" />
       </div>
     )
+  }
+
+  if (!isOwner) {
+    return null
   }
 
   return (
