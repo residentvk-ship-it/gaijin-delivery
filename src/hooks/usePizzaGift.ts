@@ -50,6 +50,11 @@ export type GiftState = {
 
 export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct }: Params): GiftState {
   return useMemo(() => {
+    // Проверяем текущее время (до 20:00)
+    const now = new Date()
+    const currentHour = now.getHours()
+    const isBefore8PM = currentHour < 20
+
     // Пиццы в корзине (исключая подарочную маргариту)
     const pizzaItems = items.filter(i =>
       i.product.category_id === PIZZA_CAT_ID &&
@@ -57,7 +62,9 @@ export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct
     )
 
     const pizzaCount   = pizzaItems.reduce((s, i) => s + i.quantity, 0)
-    const hasPizzaDeal = pizzaCount >= 2
+    
+    // Акция действует только если есть 2+ пиццы И сейчас до 20:00
+    const hasPizzaDeal = pizzaCount >= 2 && isBefore8PM
 
     // Считаем размер подарочной пиццы
     let giftPizzaSize: string | null = null
@@ -89,6 +96,7 @@ export function usePizzaGift({ items, subtotal, giftThreshold, margheritaProduct
       giftPizzaInCart,
       thresholdReached,
       canChooseDrink: thresholdReached,
+      // Можно выбрать пиццу только если акция активна (время + количество)
       canChoosePizza: hasPizzaDeal && thresholdReached,
     }
   }, [items, subtotal, giftThreshold])
