@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Pencil, Trash2, Eye, EyeOff, Upload, Loader2, X, Monitor, Smartphone } from 'lucide-react'
+import { Plus, Pencil, Trash2, Eye, EyeOff, Upload, Loader2, X, Monitor, Smartphone, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 interface Banner {
@@ -14,16 +15,9 @@ interface Banner {
   is_active: boolean
 }
 
-const ANON     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-
-const h = {
-  'apikey':        ANON,
-  'Authorization': `Bearer ${ANON}`,
-  'Content-Type':  'application/json',
-}
-
 export function BannerManager() {
+  const supabase = createClient()
+  
   const [banners,        setBanners]        = useState<Banner[]>([])
   const [loading,        setLoading]        = useState(true)
   const [showForm,       setShowForm]       = useState(false)
@@ -31,51 +25,92 @@ export function BannerManager() {
   const [bannersDesktop, setBannersDesktop] = useState(1)
   const [bannersMobile,  setBannersMobile]  = useState(1)
   const [savingConfig,   setSavingConfig]   = useState(false)
+  const [isAuthorized,   setIsAuthorized]   = useState(false)
+
+  // Проверка авторизации при монтировании (как защита)
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setIsAuthorized(true)
+        load()
+      } else {
+        setIsAuthorized(false)
+        toast.error('Доступ запрещен. Войдите в систему.')
+      }
+      setLoading(false)
+    }
+    checkAuth()
+  }, [])
 
   async function load() {
-    setLoading(true)
-    const [bannersRes, configRes] = await Promise.all([
-      fetch(`${SUPA_URL}/rest/v1/banners?order=sort_order`, { headers: h }).then(r => r.json()),
-      fetch(`${SUPA_URL}/rest/v1/site_config?key=in.(banners_desktop,banners_mobile)`, { headers: h }).then(r => r.json()),
-    ])
-    setBanners(Array.isArray(bannersRes) ? bannersRes : [])
-    if (Array.isArray(configRes)) {
-      setBannersDesktop(Number(configRes.find((c: any) => c.key === 'banners_desktop')?.value ?? 1))
-      setBannersMobile(Number(configRes.find((c: any) => c.key === 'banners_mobile')?.value ?? 1))
-    }
-    setLoading(false)
-  }
+    const { data: bannersData } = await supabase
+      .from('banners')
+      .select('*')
+      .order('sort_order')
 
-  useEffect(() => { load() }, [])
+    const { data: configData } = await supabase
+      .from('site_config')
+      .select('*')
+      .in('key', ['banners_desktop', 'banners_mobile'])
+
+    setBanners(bannersData || [])
+    
+    if (configData) {
+      setBannersDesktop(Number(configData.find((c: any) => c.key === 'banners_desktop')?.value ?? 1))
+      setBannersMobile(Number(configData.find((c: any) => c.key === 'banners_mobile')?.value ?? 1))
+    }
+  }
 
   async function saveConfig(key: string, value: number) {
     setSavingConfig(true)
-    await fetch(`${SUPA_URL}/rest/v1/site_config?key=eq.${key}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ value: String(value) }),
-    })
+    const { error } = await supabase
+      .from('site_config')
+      .upsert({ key, value: String(value) }, { onConflict: 'key' })
+    
     setSavingConfig(false)
-    toast.success('Настройки сохранены')
+    if (error) toast.error('Ошибка сохранения настроек')
+    else toast.success('Настройки сохранены')
   }
 
   async function toggleActive(b: Banner) {
-    await fetch(`${SUPA_URL}/rest/v1/banners?id=eq.${b.id}`, {
-      method: 'PATCH', headers: h,
-      body: JSON.stringify({ is_active: !b.is_active }),
-    })
-    setBanners(prev => prev.map(x => x.id === b.id ? { ...x, is_active: !x.is_active } : x))
+    const { error } = await supabase
+      .from('banners')
+      .update({ is_active: !b.is_active })
+      .eq('id', b.id)
+
+    if (!error) {
+      setBanners(prev => prev.map(x => x.id === b.id ? { ...x, is_active: !x.is_active } : x))
+    }
   }
 
   async function deleteBanner(id: string) {
     if (!confirm('Удалить баннер?')) return
-    await fetch(`${SUPA_URL}/rest/v1/banners?id=eq.${id}`, { method: 'DELETE', headers: h })
-    setBanners(prev => prev.filter(x => x.id !== id))
-    toast.success('Баннер удалён')
+    const { error } = await supabase.from('banners').delete().eq('id', id)
+    
+    if (!error) {
+      setBanners(prev => prev.filter(x => x.id !== id))
+      toast.success('Баннер удалён')
+    }
   }
 
   function openAdd()           { setEditing(null); setShowForm(true) }
   function openEdit(b: Banner) { setEditing(b);    setShowForm(true) }
   function closeForm()         { setShowForm(false); setEditing(null); load() }
+
+  if (loading) {
+    return <div className="p-12 text-center text-text-muted"><Loader2 className="animate-spin mx-auto" /></div>
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="bg-white rounded-card shadow-card p-12 text-center text-text-muted">
+        <LogOut size={48} className="mx-auto mb-4 text-red-500" />
+        <p className="font-medium text-lg">Доступ запрещен</p>
+        <p className="text-sm mt-2">Пожалуйста, войдите в систему для управления баннерами.</p>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -130,11 +165,7 @@ export function BannerManager() {
         </button>
       </div>
 
-      {loading ? (
-        <div className="space-y-2">
-          {[1,2].map(i => <div key={i} className="bg-white rounded-card h-20 animate-pulse" />)}
-        </div>
-      ) : banners.length === 0 ? (
+      {banners.length === 0 ? (
         <div className="bg-white rounded-card shadow-card p-12 text-center text-text-muted">
           <p className="text-4xl mb-3">🖼</p>
           <p className="font-medium">Баннеров пока нет</p>
@@ -156,10 +187,12 @@ export function BannerManager() {
                 )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => window.open(`/promo/${b.id}`, '_blank')}
-                  className="p-1.5 text-text-muted hover:text-brand transition-colors text-xs">
-                  👁 Страница
-                </button>
+                {b.link_url && (
+                  <button onClick={() => window.open(b.link_url!, '_blank')}
+                    className="p-1.5 text-text-muted hover:text-brand transition-colors text-xs" title="Открыть ссылку">
+                    🔗
+                  </button>
+                )}
                 <button onClick={() => toggleActive(b)}
                   className="p-1.5 text-text-muted hover:text-brand transition-colors">
                   {b.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
@@ -183,14 +216,20 @@ export function BannerManager() {
   )
 }
 
+// ── Форма баннера (максимально приближена к ProductForm) ─────────────────────
+
 function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () => void }) {
+  const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
+
   const [saving,    setSaving]    = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [preview,   setPreview]   = useState(banner?.image_url ?? '')
   const [imageUrl,  setImageUrl]  = useState(banner?.image_url ?? '')
+  const [imagePreview, setImagePreview] = useState(banner?.image_url ?? '')
+
   const [form, setForm] = useState({
     title:      banner?.title      ?? '',
+    link_url:   banner?.link_url   ?? '',
     content:    banner?.content    ?? '',
     sort_order: banner?.sort_order ?? 0,
     is_active:  banner?.is_active  ?? true,
@@ -200,138 +239,176 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  // Идентичная логика загрузки фото как в ProductForm
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => setPreview(ev.target?.result as string)
-    reader.readAsDataURL(file)
+    
+    setImagePreview(URL.createObjectURL(file))
     setUploading(true)
+    
     const data = new FormData()
     data.append('file', file)
+    
     try {
       const res  = await fetch('/api/upload', { method: 'POST', body: data })
       const json = await res.json()
-      if (json.url) { setImageUrl(json.url); toast.success('Файл загружен') }
-      else toast.error(json.error ?? 'Ошибка загрузки')
+      if (json.url) { 
+        setImageUrl(json.url)
+        toast.success('Фото загружено') 
+      } else { 
+        toast.error(json.error ?? 'Ошибка загрузки')
+        setImagePreview(imageUrl) // Откат при ошибке
+      }
     } catch {
-      toast.error('Ошибка загрузки')
+      toast.error('Ошибка загрузки фото')
+      setImagePreview(imageUrl) // Откат при ошибке
     } finally {
       setUploading(false)
     }
   }
 
+  // Идентичная логика сохранения как в ProductForm
   async function handleSubmit() {
     if (!imageUrl) { toast.error('Загрузите изображение'); return }
+    if (!form.title.trim()) { toast.error('Введите название'); return }
+
     setSaving(true)
 
     const payload = {
-      title:      form.title    || null,
-      content:    form.content  || null,
+      title:      form.title.trim(),
+      link_url:   form.link_url.trim() || null,
+      content:    form.content.trim() || null,
       image_url:  imageUrl,
       sort_order: Number(form.sort_order),
       is_active:  form.is_active,
     }
 
-    const res = banner
-      ? await fetch(`${SUPA_URL}/rest/v1/banners?id=eq.${banner.id}`, {
-          method: 'PATCH', headers: h, body: JSON.stringify(payload),
-        })
-      : await fetch(`${SUPA_URL}/rest/v1/banners`, {
-          method: 'POST', headers: h, body: JSON.stringify(payload),
-        })
+    const { error } = banner
+      ? await supabase.from('banners').update(payload).eq('id', banner.id)
+      : await supabase.from('banners').insert(payload)
 
     setSaving(false)
-    if (res.ok) { toast.success(banner ? 'Баннер обновлён' : 'Баннер добавлен'); onClose() }
-    else { toast.error('Ошибка сохранения') }
+
+    if (error) { 
+      toast.error('Ошибка сохранения: ' + error.message) 
+    } else { 
+      toast.success(banner ? 'Баннер обновлён' : 'Баннер добавлен')
+      onClose() 
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-card w-full max-w-md shadow-modal max-h-[90dvh] overflow-y-auto"
+      <div className="bg-white rounded-card w-full max-w-2xl max-h-[90dvh] overflow-y-auto shadow-modal"
            onClick={e => e.stopPropagation()}>
 
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border sticky top-0 bg-white">
-          <h3 className="font-bold text-text-primary">
+        {/* Шапка */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-bold text-text-primary">
             {banner ? 'Редактировать баннер' : 'Добавить баннер'}
-          </h3>
-          <button onClick={onClose} className="p-1.5 text-text-muted hover:text-text-primary">
-            <X size={18} />
+          </h2>
+          <button onClick={onClose}
+            className="p-1.5 rounded-btn text-text-muted hover:text-text-primary transition-colors">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Изображение */}
+        <div className="p-6 space-y-5">
+          {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-2">Изображение или GIF</label>
-            <div
-              className="w-full h-32 rounded-card overflow-hidden bg-surface-input border-2 border-dashed
-                         border-surface-border hover:border-brand cursor-pointer flex items-center justify-center transition-colors"
-              onClick={() => fileRef.current?.click()}
-            >
-              {preview ? (
-                <img src={preview} alt="preview" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-text-muted">
-                  <Upload size={24} />
-                  <span className="text-sm">Нажмите чтобы загрузить</span>
-                  <span className="text-xs">JPG, PNG, WebP, GIF</span>
-                </div>
-              )}
+            <div className="flex gap-4 items-start">
+              <div
+                className="w-32 h-32 rounded-card overflow-hidden bg-surface-input border-2 border-dashed border-surface-border
+                           flex items-center justify-center cursor-pointer hover:border-brand transition-colors flex-shrink-0"
+                onClick={() => fileRef.current?.click()}
+              >
+                {imagePreview ? (
+                  <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-text-muted">
+                    <Upload size={24} />
+                    <span className="text-xs">Загрузить</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="btn-secondary flex items-center gap-2 text-sm">
+                  {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploading ? 'Загружаю...' : 'Выбрать файл'}
+                </button>
+                <p className="text-xs text-text-muted">JPG, PNG, WebP, GIF · макс 5MB</p>
+                {imageUrl && (
+                  <button type="button"
+                    onClick={() => { setImageUrl(''); setImagePreview('') }}
+                    className="text-xs text-brand hover:underline text-left">
+                    Удалить фото
+                  </button>
+                )}
+              </div>
             </div>
-            <input ref={fileRef} type="file" accept="image/*,.gif" className="hidden" onChange={handleFile} />
-            {uploading && (
-              <p className="text-xs text-text-muted mt-1 flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Загружаю...
-              </p>
-            )}
+            <input ref={fileRef} type="file" accept="image/*,.gif" className="hidden" onChange={handleFileChange} />
           </div>
 
           {/* Название */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Название <span className="text-text-muted text-xs">(необязательно)</span>
+              Название <span className="text-brand">*</span>
             </label>
-            <input className="input" placeholder="Скидка 20% на роллы"
-              value={form.title} onChange={e => set('title', e.target.value)} />
+            <input className="input" value={form.title}
+              onChange={e => set('title', e.target.value)} placeholder="Скидка 20% на роллы" />
+          </div>
+
+          {/* Ссылка (добавлено для полноты) */}
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5">
+              Ссылка при клике <span className="text-text-muted text-xs">(необязательно)</span>
+            </label>
+            <input className="input" value={form.link_url}
+              onChange={e => set('link_url', e.target.value)} placeholder="https://... или /catalog/pizza" />
           </div>
 
           {/* Контент страницы */}
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Текст акции <span className="text-text-muted text-xs">(показывается на странице акции)</span>
+              Текст акции <span className="text-text-muted text-xs">(показывается на отдельной странице)</span>
             </label>
-            <textarea className="input resize-none" rows={6}
-              placeholder="Опишите условия акции, сроки, детали..."
-              value={form.content} onChange={e => set('content', e.target.value)} />
+            <textarea className="input resize-none" rows={4} value={form.content}
+              onChange={e => set('content', e.target.value)}
+              placeholder="Опишите условия акции, сроки, детали..." />
           </div>
 
           {/* Порядок */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">Порядок</label>
-            <input className="input" type="number" min="0"
-              value={form.sort_order} onChange={e => set('sort_order', e.target.value)} />
+            <label className="block text-sm font-medium text-text-primary mb-1.5">Порядок сортировки</label>
+            <input className="input w-32" type="number" min="0" value={form.sort_order}
+              onChange={e => set('sort_order', e.target.value)} />
           </div>
 
           {/* Активность */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div onClick={() => set('is_active', !form.is_active)}
-              className={`w-10 h-6 rounded-full transition-colors relative
-                ${form.is_active ? 'bg-brand' : 'bg-surface-border'}`}>
-              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform
-                ${form.is_active ? 'translate-x-5' : 'translate-x-1'}`} />
-            </div>
-            <span className="text-sm text-text-primary">Показывать на сайте</span>
-          </label>
+          <div className="flex flex-wrap gap-4 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div
+                onClick={() => set('is_active', !form.is_active)}
+                className={`w-10 h-6 rounded-full transition-colors relative ${form.is_active ? 'bg-brand' : 'bg-surface-border'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-1'}`} />
+              </div>
+              <span className="text-sm text-text-primary">Показывать на сайте</span>
+            </label>
+          </div>
         </div>
 
-        <div className="flex gap-3 px-5 py-4 border-t border-surface-border">
+        {/* Кнопки */}
+        <div className="flex gap-3 px-6 py-4 border-t border-surface-border">
           <button onClick={handleSubmit} disabled={saving || uploading}
             className="btn-primary flex-1 flex items-center justify-center gap-2">
             {saving && <Loader2 size={16} className="animate-spin" />}
             {saving ? 'Сохраняю...' : (banner ? 'Сохранить' : 'Добавить')}
           </button>
-          <button onClick={onClose} className="btn-secondary px-5">Отмена</button>
+          <button onClick={onClose} className="btn-secondary px-6">Отмена</button>
         </div>
       </div>
     </div>
