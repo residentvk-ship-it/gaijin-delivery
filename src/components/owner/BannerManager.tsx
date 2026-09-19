@@ -271,7 +271,7 @@ function BannerForm({ banner, onClose }: { banner: Banner | null; onClose: () =>
   // Идентичная логика сохранения как в ProductForm
   async function handleSubmit() {
     if (!imageUrl) { toast.error('Загрузите изображение'); return }
-    if (!form.title.trim()) { toast.error('Введите название'); return }
+    //if (!form.title.trim()) { toast.error('Введите название'); return }
 
     setSaving(true)
 
