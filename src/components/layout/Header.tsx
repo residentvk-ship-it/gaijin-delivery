@@ -55,33 +55,40 @@ export function Header() {
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-  const supabase = createClient()
+    if (!mounted) return
+    const supabase = createClient()
 
-  async function loadUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setProfile(null); return }
+    async function fetchProfile(user: { id: string; user_metadata?: { name?: string } } | null) {
+      if (!user) {
+        setProfile(null)
+        return
+      }
 
-    const { data } = await supabase
-      .from('users_profiles')
-      .select('name, role')
-      .eq('id', user.id)
-      .single()
+      const { data } = await supabase
+        .from('users_profiles')
+        .select('name, role')
+        .eq('id', user.id)
+        .single()
 
-    if (data) {
-      setProfile({ name: data.name ?? user.user_metadata?.name, role: data.role })
-    } else {
-      setProfile({ name: user.user_metadata?.name ?? null, role: 'customer' })
+      if (data) {
+        setProfile({ name: data.name ?? user.user_metadata?.name ?? null, role: data.role })
+      } else {
+        setProfile({ name: user.user_metadata?.name ?? null, role: 'customer' })
+      }
     }
-  }
 
-  if (mounted) loadUser()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      fetchProfile(user)
+    })
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-    loadUser()
-  })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        fetchProfile(session?.user ?? null)
+      }
+    })
 
-  return () => subscription.unsubscribe()
-}, [mounted])
+    return () => subscription.unsubscribe()
+  }, [mounted])
 
   async function handleLogout() {
     const supabase = createClient()
